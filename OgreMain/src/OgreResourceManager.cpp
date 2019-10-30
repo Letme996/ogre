@@ -47,6 +47,8 @@ namespace Ogre {
     ResourcePtr ResourceManager::createResource(const String& name, const String& group,
         bool isManual, ManualResourceLoader* loader, const NameValuePairList* params)
     {
+        OgreAssert(!name.empty(), "resource name must not be empty");
+
         // Call creation implementation
         ResourcePtr ret = ResourcePtr(
             createImpl(name, getNextHandle(), group, isManual, loader, params));
@@ -109,21 +111,13 @@ namespace Ogre {
             std::pair<ResourceMap::iterator, bool> result;
         if(ResourceGroupManager::getSingleton().isResourceGroupInGlobalPool(res->getGroup()))
         {
-            result = mResources.insert( ResourceMap::value_type( res->getName(), res ) );
+            result = mResources.emplace(res->getName(), res);
         }
         else
         {
-            ResourceWithGroupMap::iterator itGroup = mResourcesWithGroup.find(res->getGroup());
-
             // we will create the group if it doesn't exists in our list
-            if( itGroup == mResourcesWithGroup.end())
-            {
-                ResourceMap dummy;
-                mResourcesWithGroup.insert( ResourceWithGroupMap::value_type( res->getGroup(), dummy ) );
-                itGroup = mResourcesWithGroup.find(res->getGroup());
-            }
-            result = itGroup->second.insert( ResourceMap::value_type( res->getName(), res ) );
-
+            auto resgroup = mResourcesWithGroup.emplace(res->getGroup(), ResourceMap()).first;
+            result = resgroup->second.emplace(res->getName(), res);
         }
 
         // Attempt to resolve the collision
@@ -140,27 +134,26 @@ namespace Ogre {
             // Try to do the addition again, no seconds attempts to resolve collisions are allowed
             if(ResourceGroupManager::getSingleton().isResourceGroupInGlobalPool(res->getGroup()))
             {
-                result = mResources.insert( ResourceMap::value_type( res->getName(), res ) );
+                result = mResources.emplace(res->getName(), res);
             }
             else
             {
                 ResourceWithGroupMap::iterator itGroup = mResourcesWithGroup.find(res->getGroup());
-                result = itGroup->second.insert( ResourceMap::value_type( res->getName(), res ) );
+                result = itGroup->second.emplace(res->getName(), res);
             }
         }
 
         if (!result.second)
         {
-            OGRE_EXCEPT(Exception::ERR_DUPLICATE_ITEM, "Resource with the name " + res->getName() +
+            OGRE_EXCEPT(Exception::ERR_DUPLICATE_ITEM, getResourceType()+" with the name " + res->getName() +
                 " already exists.", "ResourceManager::add");
         }
 
         // Insert the handle
-        std::pair<ResourceHandleMap::iterator, bool> resultHandle =
-            mResourcesByHandle.insert( ResourceHandleMap::value_type( res->getHandle(), res ) );
+        std::pair<ResourceHandleMap::iterator, bool> resultHandle = mResourcesByHandle.emplace(res->getHandle(), res);
         if (!resultHandle.second)
         {
-            OGRE_EXCEPT(Exception::ERR_DUPLICATE_ITEM, "Resource with the handle " +
+            OGRE_EXCEPT(Exception::ERR_DUPLICATE_ITEM, getResourceType()+" with the handle " +
                 StringConverter::toString((long) (res->getHandle())) +
                 " already exists.", "ResourceManager::add");
         }

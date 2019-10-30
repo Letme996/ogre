@@ -33,13 +33,13 @@ THE SOFTWARE.
 #include "OgreGLUtil.h"
 #include "OgreRoot.h"
 #include "OgreGLES2RenderSystem.h"
-#include "OgreGLES2Support.h"
+#include "OgreGLNativeSupport.h"
 
 namespace Ogre {
 
 //-----------------------------------------------------------------------------
     GLES2FrameBufferObject::GLES2FrameBufferObject(GLES2FBOManager *manager, uint fsaa):
-        mManager(manager), mContext(NULL), mNumSamples(fsaa)
+        GLFrameBufferObjectCommon(fsaa), mManager(manager)
     {
 #if OGRE_PLATFORM == OGRE_PLATFORM_APPLE_IOS
         GLint oldfb = 0;
@@ -81,14 +81,6 @@ namespace Ogre {
 #if OGRE_PLATFORM == OGRE_PLATFORM_APPLE_IOS
         OGRE_CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, oldfb));
 #endif
-
-        // Initialise state
-        mDepth.buffer = 0;
-        mStencil.buffer = 0;
-        for(size_t x = 0; x < OGRE_MAX_MULTIPLE_RENDER_TARGETS; ++x)
-        {
-            mColour[x].buffer=0;
-        }
     }
     
     GLES2FrameBufferObject::~GLES2FrameBufferObject()
@@ -131,25 +123,6 @@ namespace Ogre {
     }
 #endif
     
-    
-    void GLES2FrameBufferObject::bindSurface(size_t attachment, const GLSurfaceDesc &target)
-    {
-        assert(attachment < OGRE_MAX_MULTIPLE_RENDER_TARGETS);
-        mColour[attachment] = target;
-        // Re-initialise
-        if(mColour[0].buffer)
-            initialise();
-    }
-    
-    void GLES2FrameBufferObject::unbindSurface(size_t attachment)
-    {
-        assert(attachment < OGRE_MAX_MULTIPLE_RENDER_TARGETS);
-        mColour[attachment].buffer = 0;
-        // Re-initialise if buffer 0 still bound
-        if(mColour[0].buffer)
-            initialise();
-    }
-    
     void GLES2FrameBufferObject::initialise()
     {
         GLES2RenderSystem* rs = getGLES2RenderSystem();
@@ -181,6 +154,8 @@ namespace Ogre {
         // Bind simple buffer to add colour attachments
         OGRE_CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, mFB));
 
+        bool isDepth = PixelUtil::isDepth(getFormat());
+
         // Bind all attachment points to frame buffer
         for(unsigned int x = 0; x < maxSupportedMRTs; ++x)
         {
@@ -196,16 +171,9 @@ namespace Ogre {
                     ss << ".";
                     OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, ss.str(), "GLES2FrameBufferObject::initialise");
                 }
-                if(mColour[x].buffer->getGLFormat() != format)
-                {
-                    StringStream ss;
-                    ss << "Attachment " << x << " has incompatible format.";
-                    OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, ss.str(), "GLES2FrameBufferObject::initialise");
-                }
-                if(getFormat() == PF_DEPTH)
-                    mColour[x].buffer->bindToFramebuffer(GL_DEPTH_ATTACHMENT, mColour[x].zoffset);
-                else
-                    mColour[x].buffer->bindToFramebuffer(GL_COLOR_ATTACHMENT0+x, mColour[x].zoffset);
+
+                mColour[x].buffer->bindToFramebuffer(
+                    isDepth ? GL_DEPTH_ATTACHMENT : (GL_COLOR_ATTACHMENT0 + x), mColour[x].zoffset);
             }
             else
             {
@@ -245,10 +213,7 @@ namespace Ogre {
                 // Fill attached colour buffers
                 if(mColour[x].buffer)
                 {
-                    if(getFormat() == PF_DEPTH)
-                        bufs[x] = GL_DEPTH_ATTACHMENT;
-                    else
-                        bufs[x] = GL_COLOR_ATTACHMENT0 + x;
+                    bufs[x] = isDepth ? GL_DEPTH_ATTACHMENT : (GL_COLOR_ATTACHMENT0 + x);
                     // Keep highest used buffer + 1
                     n = x+1;
                 }
@@ -259,19 +224,8 @@ namespace Ogre {
             }
 
             // Drawbuffer extension supported, use it
-            if(getFormat() != PF_DEPTH)
+            if(!isDepth)
                 OGRE_CHECK_GL_ERROR(glDrawBuffers(n, bufs));
-
-            if (mMultisampleFB)
-            {
-                // we need a read buffer because we'll be blitting to mFB
-                OGRE_CHECK_GL_ERROR(glReadBuffer(bufs[0]));
-            }
-            else
-            {
-                // No read buffer, by default, if we want to read anyway we must not forget to set this.
-                OGRE_CHECK_GL_ERROR(glReadBuffer(GL_NONE));
-            }
         }
         // Check status
         GLuint status;
@@ -390,8 +344,8 @@ namespace Ogre {
 
         if( glDepthBuffer )
         {
-            GLES2RenderBuffer *depthBuf   = glDepthBuffer->getDepthBuffer();
-            GLES2RenderBuffer *stencilBuf = glDepthBuffer->getStencilBuffer();
+            auto *depthBuf   = glDepthBuffer->getDepthBuffer();
+            auto *stencilBuf = glDepthBuffer->getStencilBuffer();
 
             //Attach depth buffer, if it has one.
             if( depthBuf )
@@ -417,26 +371,6 @@ namespace Ogre {
             OGRE_CHECK_GL_ERROR(glFramebufferRenderbuffer( GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0 ));
             OGRE_CHECK_GL_ERROR(glFramebufferRenderbuffer( GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0 ));
         }
-    }
-
-    uint32 GLES2FrameBufferObject::getWidth()
-    {
-        assert(mColour[0].buffer);
-        return mColour[0].buffer->getWidth();
-    }
-    uint32 GLES2FrameBufferObject::getHeight()
-    {
-        assert(mColour[0].buffer);
-        return mColour[0].buffer->getHeight();
-    }
-    PixelFormat GLES2FrameBufferObject::getFormat()
-    {
-        assert(mColour[0].buffer);
-        return mColour[0].buffer->getFormat();
-    }
-    GLsizei GLES2FrameBufferObject::getFSAA()
-    {
-        return mNumSamples;
     }
 //-----------------------------------------------------------------------------
 }

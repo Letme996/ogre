@@ -23,38 +23,37 @@ if(OGRE_BUILD_PLATFORM_EMSCRIPTEN)
     ${OGRE_DEPENDENCIES_DIR}
     ${EMSCRIPTEN_ROOT_PATH}/system
     ${ENV_OGRE_DEPENDENCIES_DIR}
-    "${OGRE_BINARY_DIR}/EmscriptenDependencies"
-    "${OGRE_SOURCE_DIR}/EmscriptenDependencies"
-    "${OGRE_BINARY_DIR}/../EmscriptenDependencies"
-    "${OGRE_SOURCE_DIR}/../EmscriptenDependencies"
+    "${PROJECT_BINARY_DIR}/EmscriptenDependencies"
+    "${PROJECT_SOURCE_DIR}/EmscriptenDependencies"
+    "${PROJECT_BINARY_DIR}/../EmscriptenDependencies"
+    "${PROJECT_SOURCE_DIR}/../EmscriptenDependencies"
   )
-  set(CMAKE_FIND_ROOT_PATH ${CMAKE_FIND_ROOT_PATH} ${OGRE_DEP_SEARCH_PATH})
 elseif(APPLE_IOS)
   set(OGRE_DEP_SEARCH_PATH 
     ${OGRE_DEPENDENCIES_DIR}
     ${ENV_OGRE_DEPENDENCIES_DIR}
-    "${OGRE_BINARY_DIR}/iOSDependencies"
-    "${OGRE_SOURCE_DIR}/iOSDependencies"
-    "${OGRE_BINARY_DIR}/../iOSDependencies"
-    "${OGRE_SOURCE_DIR}/../iOSDependencies"
+    "${PROJECT_BINARY_DIR}/iOSDependencies"
+    "${PROJECT_SOURCE_DIR}/iOSDependencies"
+    "${PROJECT_BINARY_DIR}/../iOSDependencies"
+    "${PROJECT_SOURCE_DIR}/../iOSDependencies"
   )
 elseif(OGRE_BUILD_PLATFORM_ANDROID)
   set(OGRE_DEP_SEARCH_PATH 
     ${OGRE_DEPENDENCIES_DIR}
     ${ENV_OGRE_DEPENDENCIES_DIR}
-    "${OGRE_BINARY_DIR}/AndroidDependencies"
-    "${OGRE_SOURCE_DIR}/AndroidDependencies"
-    "${OGRE_BINARY_DIR}/../AndroidDependencies"
-    "${OGRE_SOURCE_DIR}/../AndroidDependencies"
+    "${PROJECT_BINARY_DIR}/AndroidDependencies"
+    "${PROJECT_SOURCE_DIR}/AndroidDependencies"
+    "${PROJECT_BINARY_DIR}/../AndroidDependencies"
+    "${PROJECT_SOURCE_DIR}/../AndroidDependencies"
   )
 else()
   set(OGRE_DEP_SEARCH_PATH 
     ${OGRE_DEPENDENCIES_DIR}
     ${ENV_OGRE_DEPENDENCIES_DIR}
-    "${OGRE_BINARY_DIR}/Dependencies"
-    "${OGRE_SOURCE_DIR}/Dependencies"
-    "${OGRE_BINARY_DIR}/../Dependencies"
-    "${OGRE_SOURCE_DIR}/../Dependencies"
+    "${PROJECT_BINARY_DIR}/Dependencies"
+    "${PROJECT_SOURCE_DIR}/Dependencies"
+    "${PROJECT_BINARY_DIR}/../Dependencies"
+    "${PROJECT_SOURCE_DIR}/../Dependencies"
   )
 endif()
 
@@ -62,6 +61,8 @@ message(STATUS "Search path: ${OGRE_DEP_SEARCH_PATH}")
 list(GET OGRE_DEP_SEARCH_PATH 0 OGREDEPS_PATH)
 
 if(CMAKE_CROSSCOMPILING)
+    set(CMAKE_FIND_ROOT_PATH ${OGREDEPS_PATH} "${CMAKE_FIND_ROOT_PATH}")
+
     set(CROSS -DCMAKE_TOOLCHAIN_FILE=${CMAKE_TOOLCHAIN_FILE})
     
     if(ANDROID)
@@ -74,8 +75,28 @@ if(CMAKE_CROSSCOMPILING)
     if(APPLE_IOS)
         set(CROSS ${CROSS}
             -DIOS_PLATFORM=${IOS_PLATFORM})
+    else()
+        # this should help discovering zlib, but on ios it breaks it
+        set(CROSS ${CROSS}
+            -DCMAKE_FIND_ROOT_PATH=${CMAKE_FIND_ROOT_PATH})
     endif()
 endif()
+
+set(OGREDEPS_SHARED TRUE)
+if(OGRE_STATIC OR MSVC)
+    # freetype does not like shared build on MSVC and it generally eases distribution there
+    set(OGREDEPS_SHARED FALSE)
+endif()
+
+set(BUILD_COMMAND_OPTS --target install --config ${CMAKE_BUILD_TYPE})
+
+set(BUILD_COMMAND_COMMON ${CMAKE_COMMAND}
+  -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+  -DCMAKE_INSTALL_PREFIX=${OGREDEPS_PATH}
+  -G ${CMAKE_GENERATOR}
+  -DCMAKE_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}
+  -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
+  ${CROSS})
 
 # Set hardcoded path guesses for various platforms
 if (UNIX AND NOT EMSCRIPTEN)
@@ -89,100 +110,91 @@ set(CMAKE_PREFIX_PATH ${CMAKE_PREFIX_PATH} ${OGRE_DEP_SEARCH_PATH})
 set(CMAKE_FRAMEWORK_PATH ${CMAKE_FRAMEWORK_PATH} ${OGRE_DEP_SEARCH_PATH})
 
 if(OGRE_BUILD_DEPENDENCIES AND NOT EXISTS ${OGREDEPS_PATH})
-    set(OGREDEPS_SHARED TRUE)
-    if(OGRE_STATIC OR MSVC)
-        # freetype does not like shared build on MSVC and it generally eases distribution there
-        set(OGREDEPS_SHARED FALSE)
-    endif()
-
-    set(BUILD_COMMAND_OPTS --target install --config ${CMAKE_BUILD_TYPE})
-
-    if(MSVC OR EMSCRIPTEN) # other platforms ship zlib
+    if(MSVC OR EMSCRIPTEN OR MINGW) # other platforms ship zlib
         message(STATUS "Building zlib")
         file(DOWNLOAD 
             http://zlib.net/zlib-1.2.11.tar.gz
-            ${OGRE_BINARY_DIR}/zlib-1.2.11.tar.gz 
+            ${PROJECT_BINARY_DIR}/zlib-1.2.11.tar.gz 
             EXPECTED_MD5 1c9f62f0778697a09d36121ead88e08e)
         execute_process(COMMAND ${CMAKE_COMMAND} 
-            -E tar xf zlib-1.2.11.tar.gz WORKING_DIRECTORY ${OGRE_BINARY_DIR})
-        execute_process(COMMAND ${CMAKE_COMMAND}
-            -DCMAKE_INSTALL_PREFIX=${OGREDEPS_PATH}
-            -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+            -E tar xf zlib-1.2.11.tar.gz WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
+        execute_process(COMMAND ${BUILD_COMMAND_COMMON}
             -DBUILD_SHARED_LIBS=${OGREDEPS_SHARED}
-            -G ${CMAKE_GENERATOR}
-            -DCMAKE_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}
-            ${CROSS}
-            ${CMAKE_BINARY_DIR}/zlib-1.2.11
-            WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/zlib-1.2.11)
+            ${PROJECT_BINARY_DIR}/zlib-1.2.11
+            WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/zlib-1.2.11)
         execute_process(COMMAND ${CMAKE_COMMAND} 
-            --build ${CMAKE_BINARY_DIR}/zlib-1.2.11 ${BUILD_COMMAND_OPTS})
+            --build ${PROJECT_BINARY_DIR}/zlib-1.2.11 ${BUILD_COMMAND_OPTS})
     endif()
 
     message(STATUS "Building ZZIPlib")
     file(DOWNLOAD
-        https://github.com/paroj/ZZIPlib/archive/master.tar.gz
-        ${OGRE_BINARY_DIR}/ZZIPlib-master.tar.gz)
+        https://github.com/gdraheim/zziplib/archive/develop.zip
+        ${PROJECT_BINARY_DIR}/zziplib-develop.tar.gz)
     execute_process(COMMAND ${CMAKE_COMMAND}
-        -E tar xf ZZIPlib-master.tar.gz WORKING_DIRECTORY ${OGRE_BINARY_DIR})
-    execute_process(COMMAND ${CMAKE_COMMAND}
-        -DCMAKE_INSTALL_PREFIX=${OGREDEPS_PATH}
-        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+        -E tar xf zziplib-develop.tar.gz WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
+    execute_process(COMMAND ${BUILD_COMMAND_COMMON}
         -DZLIB_ROOT=${OGREDEPS_PATH}
+        -DZZIPMMAPPED=OFF -DZZIPCOMPAT=OFF -DZZIPLIBTOOL=OFF -DZZIPFSEEKO=OFF -DZZIPWRAP=OFF -DZZIPSDL=OFF -DZZIPBINS=OFF -DZZIPTEST=OFF -DZZIPDOCS=OFF -DBASH=sh
+        -DBUILD_STATIC_LIBS=TRUE
         -DBUILD_SHARED_LIBS=${OGREDEPS_SHARED}
-        -G ${CMAKE_GENERATOR}
-        -DCMAKE_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}
-        ${CROSS}
-        ${CMAKE_BINARY_DIR}/ZZIPlib-master
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/ZZIPlib-master)
+        ${PROJECT_BINARY_DIR}/zziplib-develop
+        WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/zziplib-develop)
     execute_process(COMMAND ${CMAKE_COMMAND} 
-        --build ${CMAKE_BINARY_DIR}/ZZIPlib-master ${BUILD_COMMAND_OPTS})
-    
-    message(STATUS "Building freetype")
-    file(DOWNLOAD
-        http://download.savannah.gnu.org/releases/freetype/freetype-2.6.5.tar.gz
-        ${OGRE_BINARY_DIR}/freetype-2.6.5.tar.gz)
-    execute_process(COMMAND ${CMAKE_COMMAND}
-        -E tar xf freetype-2.6.5.tar.gz WORKING_DIRECTORY ${OGRE_BINARY_DIR})
-    # patch toolchain for iOS
-    execute_process(COMMAND ${CMAKE_COMMAND} -E copy
-        ${CMAKE_SOURCE_DIR}/CMake/toolchain/ios.toolchain.xcode.cmake
-        freetype-2.6.5/builds/cmake/iOS.cmake
-		WORKING_DIRECTORY ${OGRE_BINARY_DIR})
-    execute_process(COMMAND ${CMAKE_COMMAND}
-        -DCMAKE_INSTALL_PREFIX=${OGREDEPS_PATH}
-        -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
-        -DBUILD_SHARED_LIBS=${OGREDEPS_SHARED}
-        -DWITH_BZip2=OFF # tries to use it on iOS otherwise
-        # workaround for broken iOS toolchain in freetype
-        -DPROJECT_SOURCE_DIR=${CMAKE_BINARY_DIR}/freetype-2.6.5
-        ${CROSS}
-        -G ${CMAKE_GENERATOR}
-        -DCMAKE_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}
-        ${CMAKE_BINARY_DIR}/freetype-2.6.5
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/freetype-2.6.5/objs)
-    execute_process(COMMAND ${CMAKE_COMMAND}
-        --build ${CMAKE_BINARY_DIR}/freetype-2.6.5/objs ${BUILD_COMMAND_OPTS})
+        --build ${PROJECT_BINARY_DIR}/zziplib-develop ${BUILD_COMMAND_OPTS})
 
-    if(MSVC) # other platforms dont need this
+    message(STATUS "Building pugixml")
+    file(DOWNLOAD
+        https://github.com/zeux/pugixml/releases/download/v1.10/pugixml-1.10.tar.gz
+        ${PROJECT_BINARY_DIR}/pugixml-1.10.tar.gz)
+    execute_process(COMMAND ${CMAKE_COMMAND}
+        -E tar xf pugixml-1.10.tar.gz WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
+    execute_process(COMMAND ${BUILD_COMMAND_COMMON}
+        -DCMAKE_POSITION_INDEPENDENT_CODE=TRUE # this will be linked into a shared lib
+        ${PROJECT_BINARY_DIR}/pugixml-1.10
+        WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/pugixml-1.10)
+    execute_process(COMMAND ${CMAKE_COMMAND}
+        --build ${PROJECT_BINARY_DIR}/pugixml-1.10 ${BUILD_COMMAND_OPTS})
+
+    find_package(Freetype)
+    if (NOT FREETYPE_FOUND)
+        message(STATUS "Building freetype")
+        file(DOWNLOAD
+            https://download.savannah.gnu.org/releases/freetype/freetype-2.9.tar.gz
+            ${PROJECT_BINARY_DIR}/freetype-2.9.tar.gz)
+        execute_process(COMMAND ${CMAKE_COMMAND}
+            -E tar xf freetype-2.9.tar.gz WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
+        # patch toolchain for iOS
+        execute_process(COMMAND ${CMAKE_COMMAND} -E copy
+            ${PROJECT_SOURCE_DIR}/CMake/toolchain/ios.toolchain.xcode.cmake
+            freetype-2.9/builds/cmake/iOS.cmake
+            WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
+        execute_process(COMMAND ${BUILD_COMMAND_COMMON}
+            -DBUILD_SHARED_LIBS=${OGREDEPS_SHARED}
+            -DWITH_PNG=OFF
+            -DWITH_BZip2=OFF # tries to use it on iOS otherwise
+            # workaround for broken iOS toolchain in freetype
+            -DPROJECT_SOURCE_DIR=${PROJECT_BINARY_DIR}/freetype-2.9
+            ${PROJECT_BINARY_DIR}/freetype-2.9
+            WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/freetype-2.9/objs)
+        execute_process(COMMAND ${CMAKE_COMMAND}
+            --build ${PROJECT_BINARY_DIR}/freetype-2.9/objs ${BUILD_COMMAND_OPTS})
+    endif()
+
+    if(MSVC OR MINGW) # other platforms dont need this
         message(STATUS "Building SDL2")
         file(DOWNLOAD
-            https://libsdl.org/release/SDL2-2.0.5.tar.gz
-            ${OGRE_BINARY_DIR}/SDL2-2.0.5.tar.gz)
+            https://libsdl.org/release/SDL2-2.0.8.tar.gz
+            ${PROJECT_BINARY_DIR}/SDL2-2.0.8.tar.gz)
         execute_process(COMMAND ${CMAKE_COMMAND} 
-            -E tar xf SDL2-2.0.5.tar.gz WORKING_DIRECTORY ${OGRE_BINARY_DIR})
+            -E tar xf SDL2-2.0.8.tar.gz WORKING_DIRECTORY ${PROJECT_BINARY_DIR})
         execute_process(COMMAND ${CMAKE_COMMAND}
-            -E make_directory ${OGRE_BINARY_DIR}/SDL2-build)
-        execute_process(COMMAND ${CMAKE_COMMAND}
-            -DCMAKE_INSTALL_PREFIX=${OGREDEPS_PATH}
-            -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+            -E make_directory ${PROJECT_BINARY_DIR}/SDL2-build)
+        execute_process(COMMAND ${BUILD_COMMAND_COMMON}
             -DSDL_STATIC=FALSE
-            -G ${CMAKE_GENERATOR}
-            -DCMAKE_GENERATOR_PLATFORM=${CMAKE_GENERATOR_PLATFORM}
-            ${CROSS}
-            ${OGRE_BINARY_DIR}/SDL2-2.0.5
-            WORKING_DIRECTORY ${OGRE_BINARY_DIR}/SDL2-build)
+            ${PROJECT_BINARY_DIR}/SDL2-2.0.8
+            WORKING_DIRECTORY ${PROJECT_BINARY_DIR}/SDL2-build)
         execute_process(COMMAND ${CMAKE_COMMAND}
-            --build ${OGRE_BINARY_DIR}/SDL2-build ${BUILD_COMMAND_OPTS})
+            --build ${PROJECT_BINARY_DIR}/SDL2-build ${BUILD_COMMAND_OPTS})
     endif()
 endif()
 
@@ -232,10 +244,6 @@ endif()
 find_package(OpenGLES2)
 macro_log_feature(OPENGLES2_FOUND "OpenGL ES 2.x" "Support for the OpenGL ES 2.x render system" "http://www.khronos.org/opengles/" FALSE "" "")
 
-# Find OpenGL ES 3.x
-find_package(OpenGLES3)
-macro_log_feature(OPENGLES3_FOUND "OpenGL ES 3.x" "Support for the OpenGL ES 2.x render system with OpenGL ES 3 support" "http://www.khronos.org/opengles/" FALSE "" "")
-
 # Find DirectX
 if(WIN32)
 	find_package(DirectX)
@@ -279,7 +287,7 @@ macro_log_feature(PYTHONLIBS_FOUND "Python" "Language bindings to use OGRE from 
 #######################################################################
 
 # Find sdl2
-if(NOT ANDROID)
+if(NOT ANDROID AND NOT EMSCRIPTEN)
   # find script does not work in cross compilation environment
   find_package(SDL2)
   macro_log_feature(SDL2_FOUND "SDL2" "Simple DirectMedia Library needed for input handling in samples" "https://www.libsdl.org/" FALSE "" "")
@@ -309,9 +317,9 @@ macro_log_feature(Softimage_FOUND "Softimage" "Softimage SDK needed for building
 # setting everything up, including overriding any of the above
 # findings.
 set(OGREDEPS_RUNTIME_OUTPUT ${OGRE_RUNTIME_OUTPUT})
-if (EXISTS "${OGRE_SOURCE_DIR}/Dependencies/CMakeLists.txt")
+if (EXISTS "${PROJECT_SOURCE_DIR}/Dependencies/CMakeLists.txt")
   add_subdirectory(Dependencies)
-elseif (EXISTS "${OGRE_SOURCE_DIR}/ogredeps/CMakeLists.txt")
+elseif (EXISTS "${PROJECT_SOURCE_DIR}/ogredeps/CMakeLists.txt")
   add_subdirectory(ogredeps)
 endif ()
 

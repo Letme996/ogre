@@ -35,6 +35,7 @@ THE SOFTWARE.
 #include "OgreResourceGroupManager.h"
 #include "OgreOverlayElementFactory.h"
 #include "OgreStringConverter.h"
+#include "OgreOverlayTranslator.h"
 
 namespace Ogre {
 
@@ -52,13 +53,14 @@ namespace Ogre {
     OverlayManager::OverlayManager() 
       : mLastViewportWidth(0), 
         mLastViewportHeight(0), 
-        mLastViewportOrientationMode(OR_DEGREE_0)
+        mLastViewportOrientationMode(OR_DEGREE_0),
+        mPixelRatio(1)
     {
 
         // Scripting is supported by this manager
         mScriptPatterns.push_back("*.overlay");
         ResourceGroupManager::getSingleton()._registerScriptLoader(this);
-
+        mTranslatorManager.reset(new OverlayTranslatorManager());
     }
     //---------------------------------------------------------------------
     OverlayManager::~OverlayManager()
@@ -143,6 +145,14 @@ namespace Ogre {
         }
 
     }
+
+    void OverlayManager::addOverlay(Overlay* overlay)
+    {
+        bool succ = mOverlayMap.emplace(overlay->getName(), overlay).second;
+        if(succ) return;
+        OGRE_EXCEPT(Exception::ERR_DUPLICATE_ITEM,
+                    "Overlay with name '" + overlay->getName() + "' already exists!");
+    }
     //---------------------------------------------------------------------
     void OverlayManager::destroy(const String& name)
     {
@@ -186,99 +196,15 @@ namespace Ogre {
             OGRE_DELETE i->second;
         }
         mOverlayMap.clear();
-        mLoadedScripts.clear();
     }
     //---------------------------------------------------------------------
     OverlayManager::OverlayMapIterator OverlayManager::getOverlayIterator(void)
     {
         return OverlayMapIterator(mOverlayMap.begin(), mOverlayMap.end());
     }
-    //---------------------------------------------------------------------
     void OverlayManager::parseScript(DataStreamPtr& stream, const String& groupName)
     {
-        // check if we've seen this script before (can happen if included 
-        // multiple times)
-        if (!stream->getName().empty() && 
-            mLoadedScripts.find(stream->getName()) != mLoadedScripts.end())
-        {
-            LogManager::getSingleton().logMessage( 
-                "Skipping loading overlay include: '"
-                + stream->getName() + " as it is already loaded.");
-            return;
-        }
-        String line;
-        Overlay* pOverlay = 0;
-
-        while(!stream->eof())
-        {
-            bool isATemplate = false;
-            bool skipLine = false;
-            line = stream->getLine();
-            // Ignore comments & blanks
-            if (!(line.length() == 0 || line.substr(0,2) == "//"))
-            {
-                if (line.substr(0,8) == "#include")
-                {
-                    vector<String>::type params = StringUtil::split(line, "\t\n ()<>");
-                    DataStreamPtr includeStream = 
-                        ResourceGroupManager::getSingleton().openResource(
-                            params[1], groupName);
-                    parseScript(includeStream, groupName);
-                    continue;
-                }
-                if (!pOverlay)
-                {
-                    // No current overlay
-
-                    // check to see if there is a template
-                    if (line.substr(0,8) == "template")
-                    {
-                        isATemplate = true;
-                    }
-                    else
-                    {
-                        // So first valid data should be overlay name
-                        if (StringUtil::startsWith(line, "overlay "))
-                        {
-                            // chop off the 'particle_system ' needed by new compilers
-                            line = line.substr(8);
-                        }
-                        pOverlay = create(line);
-                        pOverlay->_notifyOrigin(stream->getName());
-                        // Skip to and over next {
-                        skipToNextOpenBrace(stream);
-                        skipLine = true;
-                    }
-                }
-                if ((pOverlay && !skipLine) || isATemplate)
-                {
-                    // Already in overlay
-                    vector<String>::type params = StringUtil::split(line, "\t\n ()");
-
-                    if (line == "}")
-                    {
-                        // Finished overlay
-                        pOverlay = 0;
-                    }
-                    else if (parseChildren(stream,line, pOverlay, isATemplate, NULL))
-                    {
-
-                    }
-                    else
-                    {
-                        // Attribute
-                        if (!isATemplate)
-                        {
-                            parseAttrib(line, pOverlay);
-                        }
-                    }
-                }
-            }
-        }
-
-        // record as parsed
-        mLoadedScripts.insert(stream->getName());
-
+        ScriptCompilerManager::getSingleton().parseScript(stream, groupName);
     }
     //---------------------------------------------------------------------
     void OverlayManager::_queueOverlaysForRendering(Camera* cam, 
@@ -289,15 +215,14 @@ namespace Ogre {
         orientationModeChanged = (mLastViewportOrientationMode != vp->getOrientationMode());
 #endif
         // Flag for update pixel-based GUIElements if viewport has changed dimensions
-        if (mLastViewportWidth != vp->getActualWidth() || 
-            mLastViewportHeight != vp->getActualHeight() ||
-            orientationModeChanged)
+        if (mLastViewportWidth != int(vp->getActualWidth() / mPixelRatio) ||
+            mLastViewportHeight != int(vp->getActualHeight() / mPixelRatio) || orientationModeChanged)
         {
 #if OGRE_NO_VIEWPORT_ORIENTATIONMODE == 0
             mLastViewportOrientationMode = vp->getOrientationMode();
 #endif
-            mLastViewportWidth = vp->getActualWidth();
-            mLastViewportHeight = vp->getActualHeight();
+            mLastViewportWidth = int(vp->getActualWidth() / mPixelRatio);
+            mLastViewportHeight = int(vp->getActualHeight() / mPixelRatio);
         }
 
         OverlayMap::iterator i, iend;
@@ -314,179 +239,6 @@ namespace Ogre {
 #endif
             o->_findVisibleObjects(cam, pQueue, vp);
         }
-    }
-    //---------------------------------------------------------------------
-    void OverlayManager::parseNewElement( DataStreamPtr& stream, String& elemType, String& elemName, 
-            bool isContainer, Overlay* pOverlay, bool isATemplate, String templateName, OverlayContainer* container)
-    {
-        String line;
-
-        OverlayElement* newElement = NULL;
-        newElement = 
-                OverlayManager::getSingleton().createOverlayElementFromTemplate(templateName, elemType, elemName, isATemplate);
-
-            // do not add a template to an overlay
-
-        // add new element to parent
-        if (container)
-        {
-            // Attach to container
-            container->addChild(newElement);
-        }
-        // do not add a template to the overlay. For templates overlay = 0
-        else if (pOverlay)  
-        {
-            pOverlay->add2D((OverlayContainer*)newElement);
-        }
-
-        while(!stream->eof())
-        {
-            line = stream->getLine();
-            // Ignore comments & blanks
-            if (!(line.length() == 0 || line.substr(0,2) == "//"))
-            {
-                if (line == "}")
-                {
-                    // Finished element
-                    break;
-                }
-                else
-                {
-                    if (isContainer && parseChildren(stream,line, pOverlay, isATemplate, static_cast<OverlayContainer*>(newElement)))
-                    {
-                        // nested children... don't reparse it
-                    }
-                    else
-                    {
-                        // Attribute
-                        parseElementAttrib(line, pOverlay, newElement);
-                    }
-                }
-            }
-        }
-    }
-
-    //---------------------------------------------------------------------
-    bool OverlayManager::parseChildren( DataStreamPtr& stream, const String& line,
-            Overlay* pOverlay, bool isATemplate, OverlayContainer* parent)
-    {
-        bool ret = false;
-        uint skipParam =0;
-        vector<String>::type params = StringUtil::split(line, "\t\n ()");
-
-        if (isATemplate)
-        {
-            if (params[0] == "template")
-            {
-                skipParam++;        // the first param = 'template' on a new child element
-            }
-        }
-                        
-        // top level component cannot be an element, it must be a container unless it is a template
-        if (params[0+skipParam] == "container" || (params[0+skipParam] == "element" && (isATemplate || parent != NULL)) )
-        {
-            String templateName;
-            ret = true;
-            // nested container/element
-            if (params.size() > 3+skipParam)
-            {
-                if (params.size() != 5+skipParam)
-                {
-                    LogManager::getSingleton().logMessage( 
-                        "Bad element/container line: '"
-                        + line + "' in " + parent->getTypeName()+ " " + parent->getName() +
-                        ", expecting ':' templateName", LML_CRITICAL);
-                    skipToNextCloseBrace(stream);
-                    // barf 
-                    return ret;
-                }
-                if (params[3+skipParam] != ":")
-                {
-                    LogManager::getSingleton().logMessage( 
-                        "Bad element/container line: '"
-                        + line + "' in " + parent->getTypeName()+ " " + parent->getName() +
-                        ", expecting ':' for element inheritance", LML_CRITICAL);
-                    skipToNextCloseBrace(stream);
-                    // barf 
-                    return ret;
-                }
-
-                templateName = params[4+skipParam];
-            }
-
-            else if (params.size() != 3+skipParam)
-            {
-                LogManager::getSingleton().logMessage( 
-                    "Bad element/container line: '"
-                        + line + "' in " + parent->getTypeName()+ " " + parent->getName() +
-                    ", expecting 'element type(name)'");
-                skipToNextCloseBrace(stream);
-                // barf 
-                return ret;
-            }
-       
-            skipToNextOpenBrace(stream);
-            parseNewElement(stream, params[1+skipParam], params[2+skipParam], true, pOverlay, isATemplate, templateName, (OverlayContainer*)parent);
-
-        }
-
-
-        return ret;
-    }
-
-    //---------------------------------------------------------------------
-    void OverlayManager::parseAttrib( const String& line, Overlay* pOverlay)
-    {
-        // Split params on first space
-        vector<String>::type vecparams = StringUtil::split(line, "\t ", 1);
-
-        // Look up first param (command setting)
-        StringUtil::toLowerCase(vecparams[0]);
-        if (vecparams[0] == "zorder")
-        {
-            pOverlay->setZOrder((ushort)StringConverter::parseUnsignedInt(vecparams[1]));
-        }
-        else
-        {
-            LogManager::getSingleton().logMessage("Bad overlay attribute line: '"
-                + line + "' for overlay " + pOverlay->getName(), LML_CRITICAL);
-        }
-    }
-    //---------------------------------------------------------------------
-    void OverlayManager::parseElementAttrib( const String& line, Overlay* pOverlay, OverlayElement* pElement )
-    {
-        // Split params on first space
-        vector<String>::type vecparams = StringUtil::split(line, "\t ", 1);
-
-        // Look up first param (command setting)
-        StringUtil::toLowerCase(vecparams[0]);
-        if (!pElement->setParameter(vecparams[0], vecparams[1]))
-        {
-            // BAD command. BAD!
-            LogManager::getSingleton().logMessage("Bad element attribute line: '"
-                + line + "' for element " + pElement->getName() + " in overlay " + 
-                (!pOverlay ? BLANKSTRING : pOverlay->getName()), LML_CRITICAL);
-        }
-    }
-    //-----------------------------------------------------------------------
-    void OverlayManager::skipToNextCloseBrace(DataStreamPtr& stream)
-    {
-        String line;
-        while (!stream->eof() && line != "}")
-        {
-            line = stream->getLine();
-        }
-
-    }
-    //-----------------------------------------------------------------------
-    void OverlayManager::skipToNextOpenBrace(DataStreamPtr& stream)
-    {
-        String line;
-        while (!stream->eof() && line != "{")
-        {
-            line = stream->getLine();
-        }
-
     }
     //---------------------------------------------------------------------
     int OverlayManager::getViewportHeight(void) const
@@ -508,10 +260,19 @@ namespace Ogre {
     {
 #if OGRE_NO_VIEWPORT_ORIENTATIONMODE != 0
         OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED,
-                    "Getting ViewPort orientation mode is not supported",
-                    __FUNCTION__);
+                    "Getting ViewPort orientation mode is not supported");
 #endif
         return mLastViewportOrientationMode;
+    }
+    //---------------------------------------------------------------------
+    float OverlayManager::getPixelRatio(void) const
+    {
+        return mPixelRatio;
+    }
+    //---------------------------------------------------------------------
+    void OverlayManager::setPixelRatio(Real ratio)
+    {
+        mPixelRatio = ratio;
     }
     //---------------------------------------------------------------------
     OverlayManager::ElementMap& OverlayManager::getElementMap(bool isATemplate)
@@ -579,7 +340,7 @@ namespace Ogre {
         OverlayElement* newElem = createOverlayElementFromFactory(typeName, instanceName);
 
         // Register
-        elementMap.insert(ElementMap::value_type(instanceName, newElem));
+        elementMap.emplace(instanceName, newElem);
 
         return newElem;
 

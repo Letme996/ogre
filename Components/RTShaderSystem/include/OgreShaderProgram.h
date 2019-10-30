@@ -57,7 +57,7 @@ public:
     @param autoType The auto type of the desired parameter. 
     @param data The data to associate with the auto parameter.
     @param size number of elements in the parameter.    
-    Return parameter instance in case of that resolve operation succeeded.  
+    @return parameter instance in case of that resolve operation succeeded.  
     */
     UniformParameterPtr resolveAutoParameterReal(GpuProgramParameters::AutoConstantType autoType, Real data, size_t size = 0);
     
@@ -66,24 +66,16 @@ public:
     @param type The desired data type of the auto parameter.
     @param data The data to associate with the auto parameter.
     @param size number of elements in the parameter.    
-    Return parameter instance in case of that resolve operation succeeded.  
+    @return parameter instance in case of that resolve operation succeeded.  
     */
     UniformParameterPtr resolveAutoParameterReal(GpuProgramParameters::AutoConstantType autoType, GpuConstantType type, Real data, size_t size = 0);
 
-    /** Resolve uniform auto constant parameter with associated int data of this program.
-    @param autoType The auto type of the desired parameter. 
-    @param data The data to associate with the auto parameter.
-    @param size number of elements in the parameter.    
-    Return parameter instance in case of that resolve operation succeeded.  
-    */
-    UniformParameterPtr resolveAutoParameterInt(GpuProgramParameters::AutoConstantType autoType, size_t data, size_t size = 0);
-    
     /** Resolve uniform auto constant parameter with associated int data of this program.
     @param autoType The auto type of the desired parameter.
     @param type The desired data type of the auto parameter.
     @param data The data to associate with the auto parameter.
     @param size number of elements in the parameter.
-    Return parameter instance in case of that resolve operation succeeded.  
+    @return parameter instance in case of that resolve operation succeeded.  
     */
     UniformParameterPtr resolveAutoParameterInt(GpuProgramParameters::AutoConstantType autoType, GpuConstantType type, size_t data, size_t size = 0);
 
@@ -93,11 +85,18 @@ public:
     @param suggestedName The suggested name for the parameter in case new one should be create. 
     @param variability How this parameter varies (bitwise combination of GpuProgramVariability).
     @param size number of elements in the parameter.    
-    Return parameter instance in case of that resolve operation succeeded.
+    @return parameter instance in case of that resolve operation succeeded.
     @remarks Pass -1 as index parameter to create a new parameter with the desired type and index.
     */
     UniformParameterPtr resolveParameter(GpuConstantType type, int index, uint16 variability, const String& suggestedName, size_t size = 0);
     
+    /** Resolve uniform auto constant parameter
+    @param autoType The auto type of the desired parameter
+    @param data The data to associate with the auto parameter. 
+    @return parameter instance in case of that resolve operation succeeded.  
+    */
+    UniformParameterPtr resolveParameter(GpuProgramParameters::AutoConstantType autoType, size_t data = 0);
+
     /** Get parameter by a given name.  
     @param name The name of the parameter to search for.
     @remarks Return NULL if no matching parameter found.
@@ -190,6 +189,12 @@ public:
     */
     bool getUseColumnMajorMatrices() const { return mColumnMajorMatrices; }
 
+    void addPreprocessorDefines(const String& defines);
+
+    const String& getPreprocessorDefines() const { return mPreprocessorDefines; }
+
+    /** Class destructor */
+    ~Program();
 // Protected methods.
 protected:
 
@@ -197,9 +202,6 @@ protected:
     @param type The type of this program.
     */
     Program(GpuProgramType type);
-
-    /** Class destructor */
-    ~Program();
 
     /** Destroy all parameters of this program. */
     void destroyParameters();
@@ -212,8 +214,6 @@ protected:
         
     /** Remove parameter from this program. */
     void removeParameter(UniformParameterPtr parameter);
-
-
 // Attributes.
 protected:
     // Program type. (Vertex, Fragment, Geometry).
@@ -226,12 +226,14 @@ protected:
     Function* mEntryPointFunction;
     // Program dependencies.
     StringVector mDependencies;
+    /// preprocessor definitions
+    String mPreprocessorDefines;
     // Skeletal animation calculation
     bool mSkeletalAnimation;
     // Whether to pass matrices as column-major.
     bool mColumnMajorMatrices;
 private:
-    friend class ProgramManager;
+    friend class TargetRenderState;
 };
 
 /** @} */

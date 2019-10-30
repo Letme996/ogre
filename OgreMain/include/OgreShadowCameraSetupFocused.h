@@ -69,11 +69,11 @@ namespace Ogre {
         /** Temporary preallocated frustum to set up a projection matrix in 
             calculateShadowMappingMatrix().
         */
-        Frustum* mTempFrustum;
+        std::unique_ptr<Frustum> mTempFrustum;
 
         /** Temporary preallocated camera to set up a light frustum for clipping in FocusedShadowCameraSetup::calculateB.
         */
-        Camera* mLightFrustumCamera;
+        std::unique_ptr<Camera> mLightFrustumCamera;
         mutable bool mLightFrustumCameraCalculated;
 
         /// Use tighter focus region?
@@ -267,36 +267,36 @@ namespace Ogre {
         Affine3 buildViewMatrix(const Vector3& pos, const Vector3& dir, const Vector3& up) const;
 
     public:
-        /** Default constructor.
-        @remarks
-            Temporary frustum and camera set up here.
-        */
-        FocusedShadowCameraSetup(void);
+        /// @deprecated use create()
+        FocusedShadowCameraSetup(bool useAggressiveRegion = true);
 
-        /** Default destructor.
-        @remarks
-            Temporary frustum and camera destroyed here.
-        */
-        virtual ~FocusedShadowCameraSetup(void);
+        ~FocusedShadowCameraSetup();
+
+        /** Create an instance
+
+            There are 2 approaches that can  be used to define the focus region,
+            the more aggressive way introduced by Wimmer et al, or the original
+            way as described in Stamminger et al. Wimmer et al's way tends to
+            come up with a tighter focus region but in rare cases (mostly highly
+            glancing angles) can cause some shadow casters to be clipped
+            incorrectly. By default the more aggressive approach is used since it
+            leads to significantly better results in most cases, but if you experience
+            clipping issues, you can use the less aggressive version.
+        @param useAggressiveRegion
+            True to use the more aggressive approach, false otherwise.
+         */
+        static ShadowCameraSetupPtr create(bool useAggressiveRegion = true)
+        {
+            return std::make_shared<FocusedShadowCameraSetup>(useAggressiveRegion);
+        }
 
         /** Returns a uniform shadow camera with a focused view.
         */
-        virtual void getShadowCamera(const SceneManager *sm, const Camera *cam, 
+        virtual void getShadowCamera(const SceneManager *sm, const Camera *cam,
             const Viewport *vp, const Light *light, Camera *texCam, size_t iteration) const;
 
         /** Sets whether or not to use the more aggressive approach to deciding on
             the focus region or not.
-        @note
-            There are 2 approaches that can  be used to define the focus region,
-            the more aggressive way introduced by Wimmer et al, or the original
-            way as described in Stamminger et al. Wimmer et al's way tends to 
-            come up with a tighter focus region but in rare cases (mostly highly
-            glancing angles) can cause some shadow casters to be clipped 
-            incorrectly. By default the more aggressive approach is used since it
-            leads to significantly better results in most cases, but if you experience
-            clipping issues, you can use the less aggressive version.
-        @param aggressive
-            True to use the more aggressive approach, false otherwise.
         */
         void setUseAggressiveFocusRegion(bool aggressive) { mUseAggressiveRegion = aggressive; }
 

@@ -56,8 +56,9 @@ namespace Ogre {
     */
     class _OgreExport SceneNode : public Node
     {
+        friend class SceneManager;
     public:
-        typedef vector<MovableObject*>::type ObjectMap;
+        typedef std::vector<MovableObject*> ObjectMap;
         typedef VectorIterator<ObjectMap> ObjectIterator;
         typedef ConstVectorIterator<ObjectMap> ConstObjectIterator;
 
@@ -89,13 +90,20 @@ namespace Ogre {
         /// Auto tracking target
         SceneNode* mAutoTrackTarget;
         /// Pointer to a Wire Bounding Box for this Node
-        WireBoundingBox *mWireBoundingBox;
+        std::unique_ptr<WireBoundingBox> mWireBoundingBox;
         /// Tracking offset for fine tuning
         Vector3 mAutoTrackOffset;
         /// Local 'normal' direction vector
         Vector3 mAutoTrackLocalDirection;
         /// Fixed axis to yaw around
         Vector3 mYawFixedAxis;
+
+        /** Index in the vector holding this node reference. Used for O(1) removals.
+
+            It is the parent (or our creator) the one that sets this value, not ourselves. Do NOT modify
+            it manually.
+        */
+        size_t mGlobalIndex;
 
         /// Whether to yaw around a fixed axis.
         bool mYawFixed : 1;
@@ -216,36 +224,20 @@ namespace Ogre {
         */
         const AxisAlignedBox& _getWorldAABB(void) const { return mWorldAABB; }
 
-        /** Retrieves an iterator which can be used to efficiently step through the objects 
-            attached to this node.
-        @remarks
-            This is a much faster way to go through <B>all</B> the objects attached to the node
-            than using getAttachedObject. But the iterator returned is only valid until a change
-            is made to the collection (ie an addition or removal) so treat the returned iterator
-            as transient, and don't add / remove items as you go through the iterator, save changes
-            until the end, or retrieve a new iterator after making the change. Making changes to
-            the object returned through the iterator is OK though.
-        @deprecated use getAttachedObjects()
-        */
-        ObjectIterator getAttachedObjectIterator(void) {
+        /// @deprecated use getAttachedObjects()
+        OGRE_DEPRECATED ObjectIterator getAttachedObjectIterator(void) {
             return ObjectIterator(mObjectsByName.begin(), mObjectsByName.end());
         }
-        /** Retrieves an iterator which can be used to efficiently step through the objects 
-            attached to this node.
-        @remarks
-            This is a much faster way to go through <B>all</B> the objects attached to the node
-            than using getAttachedObject. But the iterator returned is only valid until a change
-            is made to the collection (ie an addition or removal) so treat the returned iterator
-            as transient, and don't add / remove items as you go through the iterator, save changes
-            until the end, or retrieve a new iterator after making the change. Making changes to
-            the object returned through the iterator is OK though.
-        @deprecated use getAttachedObjects()
-        */
-        ConstObjectIterator getAttachedObjectIterator(void) const {
+        /// @deprecated use getAttachedObjects()
+        OGRE_DEPRECATED ConstObjectIterator getAttachedObjectIterator(void) const {
             return ConstObjectIterator(mObjectsByName.begin(), mObjectsByName.end());
         }
 
-        /// The MovableObjects associated with this node
+        /** The MovableObjects attached to this node
+         *
+         * This is a much faster way to go through <B>all</B> the objects attached to the node than
+         * using getAttachedObject.
+         */
         const ObjectMap& getAttachedObjects() const {
             return mObjectsByName;
         }
@@ -324,6 +316,7 @@ namespace Ogre {
         @remarks
             This creates a child node with a given name, which allows you to look the node up from 
             the parent which holds this collection of nodes.
+            @param name name of the node
             @param
                 translate Initial translation offset of child relative to parent
             @param

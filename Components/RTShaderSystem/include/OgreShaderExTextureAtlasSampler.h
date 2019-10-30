@@ -64,9 +64,9 @@ struct _OgreRTSSExport TextureAtlasRecord
     size_t indexInAtlas;
 };
 
-typedef vector<TextureAtlasRecord>::type TextureAtlasTable;
+typedef std::vector<TextureAtlasRecord> TextureAtlasTable;
 typedef SharedPtr<TextureAtlasTable> TextureAtlasTablePtr;
-typedef map<String, TextureAtlasTablePtr>::type TextureAtlasMap;
+typedef std::map<String, TextureAtlasTablePtr> TextureAtlasMap;
 
 
 
@@ -154,7 +154,7 @@ public:
     /** 
     @see SubRenderState::updateGpuProgramsParams.
     */
-    virtual void updateGpuProgramsParams(Renderable* rend, Pass* pass,  const AutoParamDataSource* source,  const LightList* pLightList);
+    virtual void updateGpuProgramsParams(Renderable* rend, const Pass* pass,  const AutoParamDataSource* source,  const LightList* pLightList);
 
     /** 
     @see SubRenderState::preAddToRenderState.
@@ -172,7 +172,7 @@ protected:
     /** 
     Given an address mode returns the function name which calculates the UV values for that addressing mode
     */
-    const char* getAdressingFunctionName(TextureUnitState::TextureAddressingMode mode);
+    const char* getAdressingFunctionName(TextureAddressingMode mode);
 
 
 // Attributes.
@@ -181,7 +181,7 @@ protected:
     ParameterPtr mVSInpTextureTableIndex;
     
     /// The addressing mode for each texture
-    TextureUnitState::UVWAddressingMode mTextureAddressings[TAS_MAX_TEXTURES];
+    Sampler::UVWAddressingMode mTextureAddressings[TAS_MAX_TEXTURES];
     /// The position and size of the texture in the atlas
     ParameterPtr mVSOutTextureDatas[TAS_MAX_TEXTURES];
     /// The position and size of the texture in the atlas

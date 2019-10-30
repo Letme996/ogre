@@ -60,12 +60,6 @@ namespace Ogre {
         /// Rendering loop control
         bool mStopRendering;
 
-        /** Array of up to 8 lights, indexed as per API
-            Note that a null value indicates a free slot
-          */ 
-        #define MAX_LIGHTS 8
-        Light* mLights[MAX_LIGHTS];
-
         /// View matrix to set world against
         Matrix4 mViewMatrix;
         Matrix4 mWorldMatrix;
@@ -84,16 +78,12 @@ namespace Ogre {
         /// Number of fixed-function texture units
         unsigned short mFixedFunctionTextureUnits;
 
-        void initConfigOptions(void);
-
-        void setGLLight(size_t index, Light* lt);
+        void setGLLight(size_t index, bool lt);
         void makeGLMatrix(GLfloat gl_matrix[16], const Matrix4& m);
  
         GLint getBlendMode(SceneBlendFactor ogreBlend) const;
-        GLint getTextureAddressingMode(TextureUnitState::TextureAddressingMode tam) const;
+        GLint getTextureAddressingMode(TextureAddressingMode tam) const;
                 void initialiseContext(RenderWindow* primary);
-
-        void setLights();
 
         /// Store last colour write state
         bool mColourWrite[4];
@@ -109,12 +99,6 @@ namespace Ogre {
 
         GLint convertCompareFunction(CompareFunction func) const;
         GLint convertStencilOp(StencilOperation op, bool invert = false) const;
-        
-        /// GL support class, used for creating windows etc.
-        GLSupport* mGLSupport;
-        
-        /// Internal method to set pos / direction of a light
-        void setGLLightPositionDirection(Light* lt, GLenum lightindex);
 
         bool mUseAutoTextureMatrix;
         GLfloat mAutoTextureMatrix[16];
@@ -128,33 +112,24 @@ namespace Ogre {
 
         unsigned short mCurrentLights;
 
-        GLuint getCombinedMinMipFilter(void) const;
-
         GLGpuProgram* mCurrentVertexProgram;
         GLGpuProgram* mCurrentFragmentProgram;
         GLGpuProgram* mCurrentGeometryProgram;
 
-        typedef list<GLContext*>::type GLContextList;
+        typedef std::list<GLContext*> GLContextList;
         /// List of background thread contexts
         GLContextList mBackgroundContextList;
 
         // statecaches are per context
         GLStateCacheManager* mStateCacheManager;
 
-        /** Manager object for creating render textures.
-            Direct render to texture via GL_EXT_framebuffer_object is preferable 
-            to pbuffers, which depend on the GL support used and are generally 
-            unwieldy and slow. However, FBO support for stencil buffers is poor.
-        */
-        GLRTTManager *mRTTManager;
-
         ushort mActiveTextureUnit;
         ushort mMaxBuiltInTextureAttribIndex;
 
         // local data members of _render that were moved here to improve performance
         // (save allocations)
-        vector<GLuint>::type mRenderAttribsBound;
-        vector<GLuint>::type mRenderInstanceAttribsBound;
+        std::vector<GLuint> mRenderAttribsBound;
+        std::vector<GLuint> mRenderInstanceAttribsBound;
 
 #if OGRE_NO_QUAD_BUFFER_STEREO == 0
 		/// @copydoc RenderSystem::setDrawBuffer
@@ -166,6 +141,11 @@ namespace Ogre {
         void bindVertexElementToGpu(const VertexElement& elem,
                                     const HardwareVertexBufferSharedPtr& vertexBuffer,
                                     const size_t vertexStart);
+
+        /** Initialises GL extensions, must be done AFTER the GL context has been
+            established.
+        */
+        void initialiseExtensions();
     public:
         // Default constructor / destructor
         GLRenderSystem();
@@ -175,24 +155,19 @@ namespace Ogre {
         // Overridden RenderSystem functions
         // ----------------------------------
 
+        const GpuProgramParametersPtr& getFixedFunctionParams(TrackVertexColourType tracking, FogMode fog);
+
+        void applyFixedFunctionParams(const GpuProgramParametersPtr& params, uint16 variabilityMask);
+
         const String& getName(void) const;
 
-
-        ConfigOptionMap& getConfigOptions(void);
-
-        void setConfigOption(const String &name, const String &value);
-
-        String validateConfigOptions(void);
-
-        RenderWindow* _initialise(bool autoCreateWindow, const String& windowTitle = "OGRE Render Window");
+        void _initialise() override;
 
         virtual RenderSystemCapabilities* createRenderSystemCapabilities() const;
 
         void initialiseFromRenderSystemCapabilities(RenderSystemCapabilities* caps, RenderTarget* primary);
 
         void shutdown(void);
-
-        void setAmbientLight(float r, float g, float b);
 
         void setShadingType(ShadeOptions so);
 
@@ -208,10 +183,6 @@ namespace Ogre {
 
         /// @copydoc RenderSystem::_createDepthBufferFor
         DepthBuffer* _createDepthBufferFor( RenderTarget *renderTarget );
-
-        /// Mimics D3D9RenderSystem::_getDepthStencilFormatFor, if no FBO RTT manager, outputs GL_NONE
-        void _getDepthStencilFormatFor( PixelFormat internalColourFormat, GLenum *depthFormat,
-                                        GLenum *stencilFormat );
         
         /// @copydoc RenderSystem::createMultiRenderTarget
         virtual MultiRenderTarget * createMultiRenderTarget(const String & name); 
@@ -225,37 +196,25 @@ namespace Ogre {
         // Low-level overridden members
         // -----------------------------
 
-        void _useLights(const LightList& lights, unsigned short limit);
+        void _useLights(unsigned short limit);
 
-        bool areFixedFunctionLightsInViewSpace() const { return true; }
+        void setWorldMatrix(const Matrix4 &m);
 
-        void _setWorldMatrix(const Matrix4 &m);
+        void setViewMatrix(const Matrix4 &m);
 
-        void _setViewMatrix(const Matrix4 &m);
+        void setProjectionMatrix(const Matrix4 &m);
 
-        void _setProjectionMatrix(const Matrix4 &m);
+        void _setSurfaceTracking(TrackVertexColourType tracking);
 
-        void _setSurfaceParams(const ColourValue &ambient,
-            const ColourValue &diffuse, const ColourValue &specular,
-            const ColourValue &emissive, Real shininess,
-            TrackVertexColourType tracking);
+        void _setPointParameters(bool attenuationEnabled, Real minSize, Real maxSize);
 
-        void _setPointParameters(Real size, bool attenuationEnabled, 
-            Real constant, Real linear, Real quadratic, Real minSize, Real maxSize);
+        void _setLineWidth(float width);
 
         void _setPointSpritesEnabled(bool enabled);
 
         void _setTexture(size_t unit, bool enabled, const TexturePtr &tex);
 
-        void _setVertexTexture(size_t unit, const TexturePtr &tex);     
-
-        void _setGeometryTexture(size_t unit, const TexturePtr &tex);
-
-        void _setComputeTexture(size_t unit, const TexturePtr &tex);
-
-        void _setTesselationHullTexture(size_t unit, const TexturePtr &tex);
-
-        void _setTesselationDomainTexture(size_t unit, const TexturePtr &tex);
+        void _setSampler(size_t unit, Sampler& sampler);
 
         void _setTextureCoordSet(size_t stage, size_t index);
 
@@ -264,21 +223,11 @@ namespace Ogre {
 
         void _setTextureBlendMode(size_t stage, const LayerBlendModeEx& bm);
 
-        void _setTextureAddressingMode(size_t stage, const TextureUnitState::UVWAddressingMode& uvw);
-
-        void _setTextureBorderColour(size_t stage, const ColourValue& colour);
-
-        void _setTextureMipmapBias(size_t unit, float bias);
+        void _setTextureAddressingMode(size_t stage, const Sampler::UVWAddressingMode& uvw);
 
         void _setTextureMatrix(size_t stage, const Matrix4& xform);
 
-        void _setSceneBlending(SceneBlendFactor sourceFactor, SceneBlendFactor destFactor, SceneBlendOperation op );
-
         void _setSeparateSceneBlending(SceneBlendFactor sourceFactor, SceneBlendFactor destFactor, SceneBlendFactor sourceFactorAlpha, SceneBlendFactor destFactorAlpha, SceneBlendOperation op, SceneBlendOperation alphaOp );
-
-        void _setSceneBlendingOperation(SceneBlendOperation op);
-
-        void _setSeparateSceneBlendingOperation(SceneBlendOperation op, SceneBlendOperation alphaOp);
 
         void _setAlphaRejectSettings(CompareFunction func, unsigned char value, bool alphaToCoverage);
 
@@ -302,7 +251,7 @@ namespace Ogre {
 
         void _setColourBufferWriteEnabled(bool red, bool green, bool blue, bool alpha);
 
-        void _setFog(FogMode mode, const ColourValue& colour, Real density, Real start, Real end);
+        void _setFog(FogMode mode);
 
         void setClipPlane (ushort index, Real A, Real B, Real C, Real D);
 
@@ -324,12 +273,6 @@ namespace Ogre {
 
         void _setTextureUnitFiltering(size_t unit, FilterType ftype, FilterOptions filter);
 
-        void _setTextureUnitCompareFunction(size_t unit, CompareFunction function);
-
-        void _setTextureUnitCompareEnabled(size_t unit, bool compare);
-
-        void _setTextureLayerAnisotropy(size_t unit, unsigned int maxAnisotropy);
-
         void _render(const RenderOperation& op);
 
         void bindGpuProgram(GpuProgram* prg);
@@ -337,11 +280,7 @@ namespace Ogre {
         void unbindGpuProgram(GpuProgramType gptype);
 
         void bindGpuProgramParameters(GpuProgramType gptype, 
-                                      GpuProgramParametersSharedPtr params, uint16 variabilityMask);
-        /** See
-            RenderSystem
-        */
-        void bindGpuProgramPassIterationParameters(GpuProgramType gptype);
+                                      const GpuProgramParametersPtr& params, uint16 variabilityMask);
 
         void setScissorTest(bool enabled, size_t left = 0, size_t top = 0, size_t right = 800, size_t bottom = 600) ;
         void clearFrameBuffer(unsigned int buffers, 
@@ -353,7 +292,6 @@ namespace Ogre {
         void unregisterThread();
         void preExtraThreadsStarted();
         void postExtraThreadsStarted();
-        GLSupport* getGLSupportRef() { return mGLSupport; }
 
         // ----------------------------------
         // GLRenderSystem specific members
@@ -382,9 +320,6 @@ namespace Ogre {
 
         /// @copydoc RenderSystem::getDisplayMonitorCount
         unsigned int getDisplayMonitorCount() const;
-
-        /// @copydoc RenderSystem::hasAnisotropicMipMapFilter
-        virtual bool hasAnisotropicMipMapFilter() const { return false; }
         
         /// @copydoc RenderSystem::beginProfileEvent
         virtual void beginProfileEvent( const String &eventName );

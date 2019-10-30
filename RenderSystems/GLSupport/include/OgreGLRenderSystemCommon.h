@@ -35,6 +35,8 @@ THE SOFTWARE.
 namespace Ogre {
     class GLContext;
     class GLSLProgramCommon;
+    class GLNativeSupport;
+    class GLRTTManager;
 
     class _OgreGLExport GLRenderSystemCommon : public RenderSystem
     {
@@ -44,7 +46,36 @@ namespace Ogre {
 
         /* The current GL context  - main thread only */
         GLContext* mCurrentContext;
+
+        // GL support class, used for creating windows etc.
+        GLNativeSupport* mGLSupport;
+
+        // This contains the complete list of supported extensions
+        std::set<String> mExtensionList;
+        String mVendor;
+
+        /** Manager object for creating render textures.
+            Direct render to texture via FBO is preferable
+            to pbuffers, which depend on the GL support used and are generally
+            unwieldy and slow. However, FBO support for stencil buffers is poor.
+        */
+        GLRTTManager *mRTTManager;
+
+        void initConfigOptions();
+        void refreshConfig();
     public:
+        struct VideoMode {
+            uint32 width;
+            uint32 height;
+            int16 refreshRate;
+            uint8  bpp;
+
+            String getDescription() const;
+        };
+        typedef std::vector<VideoMode>    VideoModes;
+
+        void setConfigOption(const String &name, const String &value);
+
         virtual ~GLRenderSystemCommon() {}
 
         /** @copydoc RenderTarget::copyContentsToMemory */
@@ -56,6 +87,18 @@ namespace Ogre {
 
         /** Returns the current context */
         GLContext* _getCurrentContext() { return mCurrentContext; }
+
+        /**
+        * Check if GL Version is supported
+        */
+        bool hasMinGLVersion(int major, int minor) const;
+
+        /**
+        * Check if an extension is available
+        */
+        bool checkExtension(const String& ext) const;
+
+        String validateConfigOptions() { return BLANKSTRING; }
 
         /** Unregister a render target->context mapping. If the context of target
             is the current context, change the context to the main context so it
@@ -82,26 +125,15 @@ namespace Ogre {
         void reinitialise(void)
         {
             this->shutdown();
-            this->_initialise(true);
+            this->_initialise();
         }
 
-        void _convertProjectionMatrix(const Matrix4& matrix, Matrix4& dest, bool)
-        {
-            // no conversion request for OpenGL
-            dest = matrix;
-        }
+        void _convertProjectionMatrix(const Matrix4& matrix, Matrix4& dest, bool);
 
-        void _makeProjectionMatrix(const Radian& fovy, Real aspect, Real nearPlane, Real farPlane,
-                                   Matrix4& dest, bool forGpuProgram = false);
-
-        void _makeProjectionMatrix(Real left, Real right, Real bottom, Real top,
-                                   Real nearPlane, Real farPlane, Matrix4& dest, bool forGpuProgram = false);
-
-        void _makeOrthoMatrix(const Radian& fovy, Real aspect, Real nearPlane, Real farPlane,
-                              Matrix4& dest, bool forGpuProgram = false);
-
-        void _applyObliqueDepthProjection(Matrix4& matrix, const Plane& plane,
-                                          bool forGpuProgram);
+        /// Mimics D3D9RenderSystem::_getDepthStencilFormatFor, if no FBO RTT manager, outputs GL_NONE
+        virtual void _getDepthStencilFormatFor(PixelFormat internalColourFormat,
+                                               uint32* depthFormat,
+                                               uint32* stencilFormat);
 
         /** Create VAO on current context */
         virtual uint32 _createVao() { return 0; }

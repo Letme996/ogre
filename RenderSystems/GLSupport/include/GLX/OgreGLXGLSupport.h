@@ -46,14 +46,6 @@ namespace Ogre {
         Atom mAtomFullScreen;
         Atom mAtomState;
 
-        /** @copydoc see GLNativeSupport::addConfig */
-        void addConfig(void);
-
-        /** @copydoc see GLNativeSupport::setConfigOption */
-        void setConfigOption(const String &name, const String &value);
-
-        NameValuePairList parseOptions(uint& w, uint& h, bool& fullscreen);
-
         /// @copydoc RenderSystem::createRenderWindow
         RenderWindow* newWindow(const String &name, unsigned int width, unsigned int height,
                                 bool fullScreen, const NameValuePairList *miscParams = 0);
@@ -71,7 +63,7 @@ namespace Ogre {
         void initialiseExtensions();
 
         /** @copydoc see GLNativeSupport::getProcAddress */
-        void* getProcAddress(const char* procname);
+        void* getProcAddress(const char* procname) const;
 
         // The remaining functions are internal to the GLX Rendersystem:
 
@@ -119,19 +111,6 @@ namespace Ogre {
          * Switch back to original video mode
          */
         void switchMode (void);
-
-        /**
-         * Loads an icon from an Ogre resource into the X Server. This currently only
-         * works for 24 and 32 bit displays. The image must be findable by the Ogre
-         * resource system, and of format PF_A8R8G8B8.
-         *
-         * @param display       X display
-         * @param name     Name of image to load
-         * @param pix           Receiver for the output pixmap
-         * @param mask     Receiver for the output mask (alpha bitmap)
-         * @returns               true on success
-         */
-        bool loadIcon(const String &name, Pixmap *pix, Pixmap *mask);
 
         /**
          * Get the GLXFBConfig used to create a ::GLXContext
@@ -194,26 +173,30 @@ namespace Ogre {
         XVisualInfo* getVisualFromFBConfig(GLXFBConfig fbConfig);
 
     private:
-
-        /**
-         * Refresh config options to reflect dependencies
-         */
-        void refreshConfig(void);
-
         Display* mGLDisplay; // used for GL/GLX commands
         Display* mXDisplay;  // used for other X commands and events
         bool mIsExternalDisplay;
 
-        typedef std::pair<uint, uint>      ScreenSize;
-        typedef short                                      Rate;
-        typedef std::pair<ScreenSize, Rate> VideoMode;
-        typedef std::vector<VideoMode>    VideoModes;
+        struct GLXVideoMode
+        {
+            typedef std::pair<uint, uint>      ScreenSize;
+            typedef short                      Rate;
+            ScreenSize first;
+            Rate second;
 
-        VideoModes mVideoModes;
+            GLXVideoMode() {}
+            GLXVideoMode(const VideoMode& m) : first(m.width, m.height), second(m.refreshRate) {}
+
+            bool operator!=(const GLXVideoMode& o) const
+            {
+                return first != o.first || second != o.second;
+            }
+        };
+        typedef std::vector<GLXVideoMode>    GLXVideoModes;
+
         VideoMode  mOriginalMode;
         VideoMode  mCurrentMode;
 
-        StringVector mSampleLevels;
         int mGLXVerMajor, mGLXVerMinor;
     };
 }

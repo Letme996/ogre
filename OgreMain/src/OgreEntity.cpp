@@ -40,10 +40,7 @@ namespace Ogre {
     Entity::Entity ()
         : mAnimationState(NULL),
           mTempSkelAnimInfo(),
-          mSkelAnimVertexData(0),
           mTempVertexAnimInfo(),
-          mSoftwareVertexAnimVertexData(0),
-          mHardwareVertexAnimVertexData(0),
           mVertexAnimationAppliedThisFrame(false),
           mPreparedForShadowVolumes(false),
           mDisplaySkeleton(false),
@@ -262,9 +259,9 @@ namespace Ogre {
             mAnimationState = 0;
         }
 
-        OGRE_DELETE mSkelAnimVertexData; mSkelAnimVertexData = 0;
-        OGRE_DELETE mSoftwareVertexAnimVertexData; mSoftwareVertexAnimVertexData = 0;
-        OGRE_DELETE mHardwareVertexAnimVertexData; mHardwareVertexAnimVertexData = 0;
+        mSkelAnimVertexData.reset();
+        mSoftwareVertexAnimVertexData.reset();
+        mHardwareVertexAnimVertexData.reset();
 
         mInitialised = false;
     }
@@ -454,11 +451,9 @@ namespace Ogre {
 
         }
         // Notify any child objects
-        ChildObjectList::iterator child_itr = mChildObjectList.begin();
-        ChildObjectList::iterator child_itr_end = mChildObjectList.end();
-        for( ; child_itr != child_itr_end; ++child_itr)
+        for(auto child : mChildObjectList)
         {
-            (*child_itr).second->_notifyCurrentCamera(cam);
+            child->_notifyCurrentCamera(cam);
         }
     }
     //-----------------------------------------------------------------------
@@ -565,12 +560,10 @@ namespace Ogre {
         AxisAlignedBox full_aa_box;
         full_aa_box.setNull();
 
-        ChildObjectList::const_iterator child_itr = mChildObjectList.begin();
-        ChildObjectList::const_iterator child_itr_end = mChildObjectList.end();
-        for( ; child_itr != child_itr_end; ++child_itr)
+        for(auto child : mChildObjectList)
         {
-            aa_box = child_itr->second->getBoundingBox();
-            TagPoint* tp = static_cast<TagPoint*>(child_itr->second->getParentNode());
+            aa_box = child->getBoundingBox();
+            TagPoint* tp = static_cast<TagPoint*>(child->getParentNode());
             // Use transform local to skeleton since world xform comes later
             aa_box.transform(tp->_getFullLocalTransform());
 
@@ -585,11 +578,9 @@ namespace Ogre {
         if (derive)
         {
             // derive child bounding boxes
-            ChildObjectList::const_iterator child_itr = mChildObjectList.begin();
-            ChildObjectList::const_iterator child_itr_end = mChildObjectList.end();
-            for( ; child_itr != child_itr_end; ++child_itr)
+            for(auto child : mChildObjectList)
             {
-                child_itr->second->getWorldBoundingBox(true);
+                child->getWorldBoundingBox(true);
             }
         }
         return MovableObject::getWorldBoundingBox(derive);
@@ -600,11 +591,9 @@ namespace Ogre {
         if (derive)
         {
             // derive child bounding boxes
-            ChildObjectList::const_iterator child_itr = mChildObjectList.begin();
-            ChildObjectList::const_iterator child_itr_end = mChildObjectList.end();
-            for( ; child_itr != child_itr_end; ++child_itr)
+            for(auto child : mChildObjectList)
             {
-                child_itr->second->getWorldBoundingSphere(true);
+                child->getWorldBoundingSphere(true);
             }
         }
         return MovableObject::getWorldBoundingSphere(derive);
@@ -704,11 +693,8 @@ namespace Ogre {
             displayEntity->updateAnimation();
 
             //--- pass this point,  we are sure that the transformation matrix of each bone and tagPoint have been updated
-            ChildObjectList::iterator child_itr = mChildObjectList.begin();
-            ChildObjectList::iterator child_itr_end = mChildObjectList.end();
-            for( ; child_itr != child_itr_end; ++child_itr)
+            for(auto child : mChildObjectList)
             {
-                MovableObject* child = child_itr->second;
                 bool visible = child->isVisible();
                 if (visible && (displayEntity != this))
                 {
@@ -871,7 +857,7 @@ namespace Ogre {
                         // NB we suppress hardware upload while doing blend if we're
                         // hardware animation, because the only reason for doing this
                         // is for shadow, which need only be uploaded then
-                        mTempVertexAnimInfo.bindTempCopies(mSoftwareVertexAnimVertexData,
+                        mTempVertexAnimInfo.bindTempCopies(mSoftwareVertexAnimVertexData.get(),
                                                            hwAnimation);
                     }
                     SubEntityList::iterator i, iend;
@@ -885,7 +871,7 @@ namespace Ogre {
                         {
                             bool useNormals = se->getSubMesh()->getVertexAnimationIncludesNormals();
                             se->mTempVertexAnimInfo.checkoutTempCopies(true, useNormals);
-                            se->mTempVertexAnimInfo.bindTempCopies(se->mSoftwareVertexAnimVertexData,
+                            se->mTempVertexAnimInfo.bindTempCopies(se->mSoftwareVertexAnimVertexData.get(),
                                                                    hwAnimation);
                         }
 
@@ -912,7 +898,7 @@ namespace Ogre {
                         // hardware animation, because the only reason for doing this
                         // is for shadow, which need only be uploaded then
                         mTempSkelAnimInfo.checkoutTempCopies(true, blendNormals);
-                        mTempSkelAnimInfo.bindTempCopies(mSkelAnimVertexData,
+                        mTempSkelAnimInfo.bindTempCopies(mSkelAnimVertexData.get(),
                                                          hwAnimation);
                         // Prepare blend matrices, TODO: Move out of here
                         Mesh::prepareMatricesForVertexBlend(blendMatrices,
@@ -920,8 +906,8 @@ namespace Ogre {
                         // Blend, taking source from either mesh data or morph data
                         Mesh::softwareVertexBlend(
                             (mMesh->getSharedVertexDataAnimationType() != VAT_NONE) ?
-                            mSoftwareVertexAnimVertexData : mMesh->sharedVertexData,
-                            mSkelAnimVertexData,
+                            mSoftwareVertexAnimVertexData.get() : mMesh->sharedVertexData,
+                            mSkelAnimVertexData.get(),
                             blendMatrices, mMesh->sharedBlendIndexToBoneIndexMap.size(),
                             blendNormals);
                     }
@@ -934,7 +920,7 @@ namespace Ogre {
                         if (se->isVisible() && se->mSkelAnimVertexData)
                         {
                             se->mTempSkelAnimInfo.checkoutTempCopies(true, blendNormals);
-                            se->mTempSkelAnimInfo.bindTempCopies(se->mSkelAnimVertexData,
+                            se->mTempSkelAnimInfo.bindTempCopies(se->mSkelAnimVertexData.get(),
                                                                  hwAnimation);
                             // Prepare blend matrices, TODO: Move out of here
                             Mesh::prepareMatricesForVertexBlend(blendMatrices,
@@ -942,8 +928,8 @@ namespace Ogre {
                             // Blend, taking source from either mesh data or morph data
                             Mesh::softwareVertexBlend(
                                 (se->getSubMesh()->getVertexAnimationType() != VAT_NONE)?
-                                se->mSoftwareVertexAnimVertexData : se->mSubMesh->vertexData,
-                                se->mSkelAnimVertexData,
+                                se->mSoftwareVertexAnimVertexData.get() : se->mSubMesh->vertexData,
+                                se->mSkelAnimVertexData.get(),
                                 blendMatrices, se->mSubMesh->blendIndexToBoneIndexMap.size(),
                                 blendNormals);
                         }
@@ -970,11 +956,9 @@ namespace Ogre {
             mLastParentXform = _getParentNodeFullTransform();
 
             //--- Update the child object's transforms
-            ChildObjectList::iterator child_itr = mChildObjectList.begin();
-            ChildObjectList::iterator child_itr_end = mChildObjectList.end();
-            for( ; child_itr != child_itr_end; ++child_itr)
+            for(auto child : mChildObjectList)
             {
-                (*child_itr).second->getParentNode()->_update(true, true);
+                child->getParentNode()->_update(true, true);
             }
 
             // Also calculate bone world matrices, since are used as replacement world matrices,
@@ -987,6 +971,7 @@ namespace Ogre {
                 {
                     mBoneWorldMatrices =
                         static_cast<Affine3*>(OGRE_MALLOC_SIMD(sizeof(Affine3) * mNumBoneMatrices, MEMCATEGORY_ANIMATION));
+                    std::fill(mBoneWorldMatrices, mBoneWorldMatrices + mNumBoneMatrices, Affine3::IDENTITY);
                 }
 
                 OptimisedUtil::getImplementation()->concatenateAffineMatrices(
@@ -1031,7 +1016,7 @@ namespace Ogre {
                 && msh->getSharedVertexDataAnimationType() != VAT_NONE)
             {
                 ushort supportedCount =
-                    initHardwareAnimationElements(mHardwareVertexAnimVertexData,
+                    initHardwareAnimationElements(mHardwareVertexAnimVertexData.get(),
                                                   (msh->getSharedVertexDataAnimationType() == VAT_POSE)
                                                   ? mHardwarePoseCount : 1, 
                                                   msh->getSharedVertexDataAnimationIncludesNormals());
@@ -1090,7 +1075,7 @@ namespace Ogre {
                     ->vertexBufferBinding->getBuffer(elem->getSource());
                 buf->suppressHardwareUpdate(true);
                 
-                initialisePoseVertexData(mMesh->sharedVertexData, mSoftwareVertexAnimVertexData, 
+                initialisePoseVertexData(mMesh->sharedVertexData, mSoftwareVertexAnimVertexData.get(),
                     mMesh->getSharedVertexDataAnimationIncludesNormals());
             }
             for (SubEntityList::iterator si = mSubEntityList.begin();
@@ -1140,7 +1125,7 @@ namespace Ogre {
             {
                 // if we're animating normals, if pose influence < 1 need to use the base mesh
                 if (mMesh->getSharedVertexDataAnimationIncludesNormals())
-                    finalisePoseNormals(mMesh->sharedVertexData, mSoftwareVertexAnimVertexData);
+                    finalisePoseNormals(mMesh->sharedVertexData, mSoftwareVertexAnimVertexData.get());
             
                 const VertexElement* elem = mSoftwareVertexAnimVertexData
                     ->vertexDeclaration->findElementBySemantic(VES_POSITION);
@@ -1219,7 +1204,7 @@ namespace Ogre {
         if (mMesh->sharedVertexData && hardwareAnimation 
             && mMesh->getSharedVertexDataAnimationType() == VAT_POSE)
         {
-            bindMissingHardwarePoseBuffers(mMesh->sharedVertexData, mHardwareVertexAnimVertexData);
+            bindMissingHardwarePoseBuffers(mMesh->sharedVertexData, mHardwareVertexAnimVertexData.get());
         }
 
 
@@ -1286,8 +1271,8 @@ namespace Ogre {
             {
                 HardwareVertexBufferSharedPtr buf = 
                     destData->vertexBufferBinding->getBuffer(normElem->getSource());
-                char* pBase = static_cast<char*>(buf->lock(HardwareBuffer::HBL_NORMAL));
-                pBase += destData->vertexStart * buf->getVertexSize();
+                HardwareBufferLockGuard vertexLock(buf, HardwareBuffer::HBL_NORMAL);
+                char* pBase = static_cast<char*>(vertexLock.pData) + destData->vertexStart * buf->getVertexSize();
                 
                 for (size_t v = 0; v < destData->vertexCount; ++v)
                 {
@@ -1299,7 +1284,6 @@ namespace Ogre {
                     
                     pBase += buf->getVertexSize();
                 }
-                buf->unlock();
             }
         }
     }
@@ -1317,10 +1301,10 @@ namespace Ogre {
                 srcData->vertexBufferBinding->getBuffer(srcNormElem->getSource());
             HardwareVertexBufferSharedPtr dstbuf = 
                 destData->vertexBufferBinding->getBuffer(destNormElem->getSource());
-            char* pSrcBase = static_cast<char*>(srcbuf->lock(HardwareBuffer::HBL_READ_ONLY));
-            char* pDstBase = static_cast<char*>(dstbuf->lock(HardwareBuffer::HBL_NORMAL));
-            pSrcBase += srcData->vertexStart * srcbuf->getVertexSize();
-            pDstBase += destData->vertexStart * dstbuf->getVertexSize();
+            HardwareBufferLockGuard srcLock(srcbuf, HardwareBuffer::HBL_READ_ONLY);
+            HardwareBufferLockGuard dstLock(dstbuf, HardwareBuffer::HBL_NORMAL);
+            char* pSrcBase = static_cast<char*>(srcLock.pData) + srcData->vertexStart * srcbuf->getVertexSize();
+            char* pDstBase = static_cast<char*>(dstLock.pData) + destData->vertexStart * dstbuf->getVertexSize();
             
             // The goal here is to detect the length of the vertices, and to apply
             // the base mesh vertex normal at one minus that length; this deals with 
@@ -1353,8 +1337,6 @@ namespace Ogre {
                 pDstBase += dstbuf->getVertexSize();
                 pSrcBase += dstbuf->getVertexSize();
             }
-            srcbuf->unlock();
-            dstbuf->unlock();
         }
     }
     //-----------------------------------------------------------------------
@@ -1382,19 +1364,19 @@ namespace Ogre {
     VertexData* Entity::_getSkelAnimVertexData(void) const
     {
         assert (mSkelAnimVertexData && "Not software skinned or has no shared vertex data!");
-        return mSkelAnimVertexData;
+        return mSkelAnimVertexData.get();
     }
     //-----------------------------------------------------------------------
     VertexData* Entity::_getSoftwareVertexAnimVertexData(void) const
     {
         assert (mSoftwareVertexAnimVertexData && "Not vertex animated or has no shared vertex data!");
-        return mSoftwareVertexAnimVertexData;
+        return mSoftwareVertexAnimVertexData.get();
     }
     //-----------------------------------------------------------------------
     VertexData* Entity::_getHardwareVertexAnimVertexData(void) const
     {
         assert (mHardwareVertexAnimVertexData && "Not vertex animated or has no shared vertex data!");
-        return mHardwareVertexAnimVertexData;
+        return mHardwareVertexAnimVertexData.get();
     }
     //-----------------------------------------------------------------------
     TempBlendedBufferInfo* Entity::_getSkelAnimTempBufferInfo(void)
@@ -1483,8 +1465,8 @@ namespace Ogre {
         {
             SubMesh* subMesh = mesh->getSubMesh(i);
             SubEntity* subEnt = OGRE_NEW SubEntity(this, subMesh);
-            if (subMesh->isMatInitialised())
-                subEnt->setMaterialName(subMesh->getMaterialName(), mesh->getGroup());
+            if (subMesh->getMaterial())
+                subEnt->setMaterial(subMesh->getMaterial());
             sublist->push_back(subEnt);
         }
     }
@@ -1501,9 +1483,19 @@ namespace Ogre {
     }
 
     //-----------------------------------------------------------------------
+
+    struct MovableObjectNameExists {
+        const String& name;
+        bool operator()(const MovableObject* mo) {
+            return mo->getName() == name;
+        }
+    };
+
     TagPoint* Entity::attachObjectToBone(const String &boneName, MovableObject *pMovable, const Quaternion &offsetOrientation, const Vector3 &offsetPosition)
     {
-        if (mChildObjectList.find(pMovable->getName()) != mChildObjectList.end())
+        MovableObjectNameExists pred = {pMovable->getName()};
+        auto it = std::find_if(mChildObjectList.begin(), mChildObjectList.end(), pred);
+        if (it != mChildObjectList.end())
         {
             OGRE_EXCEPT(Exception::ERR_DUPLICATE_ITEM,
                 "An object with the name " + pMovable->getName() + " already attached",
@@ -1543,30 +1535,33 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void Entity::attachObjectImpl(MovableObject *pObject, TagPoint *pAttachingPoint)
     {
-        assert(mChildObjectList.find(pObject->getName()) == mChildObjectList.end());
-        mChildObjectList[pObject->getName()] = pObject;
+        assert(std::find_if(mChildObjectList.begin(), mChildObjectList.end(),
+                            MovableObjectNameExists{pObject->getName()}) == mChildObjectList.end());
+
+        mChildObjectList.push_back(pObject);
         pObject->_notifyAttached(pAttachingPoint, true);
     }
 
     //-----------------------------------------------------------------------
     MovableObject* Entity::detachObjectFromBone(const String &name)
     {
-        ChildObjectList::iterator i = mChildObjectList.find(name);
+        MovableObjectNameExists pred = {name};
+        auto it = std::find_if(mChildObjectList.begin(), mChildObjectList.end(), pred);
 
-        if (i == mChildObjectList.end())
+        if (it == mChildObjectList.end())
         {
             OGRE_EXCEPT(Exception::ERR_ITEM_NOT_FOUND, "No child object entry found named " + name,
                 "Entity::detachObjectFromBone");
         }
-        MovableObject *obj = i->second;
-        detachObjectImpl(obj);
-        mChildObjectList.erase(i);
+        detachObjectImpl(*it);
+        std::swap(*it, mChildObjectList.back());
+        mChildObjectList.pop_back();
 
         // Trigger update of bounding box if necessary
         if (mParentNode)
             mParentNode->needUpdate();
 
-        return obj;
+        return *it;
     }
     //-----------------------------------------------------------------------
     void Entity::detachObjectFromBone(MovableObject* obj)
@@ -1575,10 +1570,11 @@ namespace Ogre {
         iend = mChildObjectList.end();
         for (i = mChildObjectList.begin(); i != iend; ++i)
         {
-            if (i->second == obj)
+            if (*i == obj)
             {
                 detachObjectImpl(obj);
-                mChildObjectList.erase(i);
+                std::swap(*i, mChildObjectList.back());
+                mChildObjectList.pop_back();
 
                 // Trigger update of bounding box if necessary
                 if (mParentNode)
@@ -1609,11 +1605,9 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void Entity::detachAllObjectsImpl(void)
     {
-        ChildObjectList::const_iterator i, iend;
-        iend = mChildObjectList.end();
-        for (i = mChildObjectList.begin(); i != iend; ++i)
+        for (auto child : mChildObjectList)
         {
-            detachObjectImpl(i->second);
+            detachObjectImpl(child);
         }
         mChildObjectList.clear();
     }
@@ -1631,21 +1625,9 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void Entity::prepareTempBlendBuffers(void)
     {
-        if (mSkelAnimVertexData)
-        {
-            OGRE_DELETE mSkelAnimVertexData;
-            mSkelAnimVertexData = 0;
-        }
-        if (mSoftwareVertexAnimVertexData)
-        {
-            OGRE_DELETE mSoftwareVertexAnimVertexData;
-            mSoftwareVertexAnimVertexData = 0;
-        }
-        if (mHardwareVertexAnimVertexData)
-        {
-            OGRE_DELETE mHardwareVertexAnimVertexData;
-            mHardwareVertexAnimVertexData = 0;
-        }
+        mSkelAnimVertexData.reset();
+        mSoftwareVertexAnimVertexData.reset();
+        mHardwareVertexAnimVertexData.reset();
 
         if (hasVertexAnimation())
         {
@@ -1657,12 +1639,12 @@ namespace Ogre {
                 // Prepare temp vertex data if needed
                 // Clone without copying data, don't remove any blending info
                 // (since if we skeletally animate too, we need it)
-                mSoftwareVertexAnimVertexData = mMesh->sharedVertexData->clone(false);
-                extractTempBufferInfo(mSoftwareVertexAnimVertexData, &mTempVertexAnimInfo);
+                mSoftwareVertexAnimVertexData.reset(mMesh->sharedVertexData->clone(false));
+                extractTempBufferInfo(mSoftwareVertexAnimVertexData.get(), &mTempVertexAnimInfo);
 
                 // Also clone for hardware usage, don't remove blend info since we'll
                 // need it if we also hardware skeletally animate
-                mHardwareVertexAnimVertexData = mMesh->sharedVertexData->clone(false);
+                mHardwareVertexAnimVertexData.reset(mMesh->sharedVertexData->clone(false));
             }
         }
 
@@ -1675,9 +1657,9 @@ namespace Ogre {
                 // Prepare temp vertex data if needed
                 // Clone without copying data, remove blending info
                 // (since blend is performed in software)
-                mSkelAnimVertexData =
-                    cloneVertexDataRemoveBlendInfo(mMesh->sharedVertexData);
-                extractTempBufferInfo(mSkelAnimVertexData, &mTempSkelAnimInfo);
+                mSkelAnimVertexData.reset(
+                    cloneVertexDataRemoveBlendInfo(mMesh->sharedVertexData));
+                extractTempBufferInfo(mSkelAnimVertexData.get(), &mTempSkelAnimInfo);
             }
 
         }
@@ -1773,9 +1755,7 @@ namespace Ogre {
         if (it == mSchemeHardwareAnim.end())
         {
             //evaluate the animation hardware value
-            it = mSchemeHardwareAnim.insert(
-                SchemeHardwareAnimMap::value_type(schemeIndex,
-                    calcVertexProcessing())).first;
+            it = mSchemeHardwareAnim.emplace(schemeIndex, calcVertexProcessing()).first;
         }
         return it->second;
     }
@@ -2064,11 +2044,10 @@ namespace Ogre {
                     if (!extrude)
                     {
                         // Lock, we'll be locking the (suppressed hardware update) shadow buffer
-                        float* pSrc = static_cast<float*>(
-                            esrPositionBuffer->lock(HardwareBuffer::HBL_NORMAL));
+                        HardwareBufferLockGuard posLock(esrPositionBuffer, HardwareBuffer::HBL_NORMAL);
+                        float* pSrc = static_cast<float*>(posLock.pData);
                         float* pDest = pSrc + (egi->vertexData->vertexCount * 3);
                         memcpy(pDest, pSrc, sizeof(float) * 3 * egi->vertexData->vertexCount);
-                        esrPositionBuffer->unlock();
                     }
                     if (egi->vertexData == mMesh->sharedVertexData)
                     {
@@ -2105,7 +2084,7 @@ namespace Ogre {
 
         if (orig == mMesh->sharedVertexData)
         {
-            return skel? mSkelAnimVertexData : mSoftwareVertexAnimVertexData;
+            return skel? mSkelAnimVertexData.get() : mSoftwareVertexAnimVertexData.get();
         }
         SubEntityList::iterator i, iend;
         iend = mSubEntityList.end();
@@ -2428,11 +2407,11 @@ namespace Ogre {
         case BIND_ORIGINAL:
             return mMesh->sharedVertexData;
         case BIND_HARDWARE_MORPH:
-            return mHardwareVertexAnimVertexData;
+            return mHardwareVertexAnimVertexData.get();
         case BIND_SOFTWARE_MORPH:
-            return mSoftwareVertexAnimVertexData;
+            return mSoftwareVertexAnimVertexData.get();
         case BIND_SOFTWARE_SKELETAL:
-            return mSkelAnimVertexData;
+            return mSkelAnimVertexData.get();
         };
         // keep compiler happy
         return mMesh->sharedVertexData;

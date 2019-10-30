@@ -164,21 +164,8 @@ namespace Ogre {
     void Quaternion::FromAxes (const Vector3& xaxis, const Vector3& yaxis, const Vector3& zaxis)
     {
         Matrix3 kRot;
-
-        kRot[0][0] = xaxis.x;
-        kRot[1][0] = xaxis.y;
-        kRot[2][0] = xaxis.z;
-
-        kRot[0][1] = yaxis.x;
-        kRot[1][1] = yaxis.y;
-        kRot[2][1] = yaxis.z;
-
-        kRot[0][2] = zaxis.x;
-        kRot[1][2] = zaxis.y;
-        kRot[2][2] = zaxis.z;
-
+        kRot.FromAxes(xaxis, yaxis, zaxis);
         FromRotationMatrix(kRot);
-
     }
     //-----------------------------------------------------------------------
     void Quaternion::ToAxes (Vector3* akAxis) const
@@ -284,32 +271,6 @@ namespace Ogre {
         );
     }
     //-----------------------------------------------------------------------
-    Quaternion Quaternion::operator* (Real fScalar) const
-    {
-        return Quaternion(fScalar*w,fScalar*x,fScalar*y,fScalar*z);
-    }
-    //-----------------------------------------------------------------------
-    Quaternion operator* (Real fScalar, const Quaternion& rkQ)
-    {
-        return Quaternion(fScalar*rkQ.w,fScalar*rkQ.x,fScalar*rkQ.y,
-            fScalar*rkQ.z);
-    }
-    //-----------------------------------------------------------------------
-    Quaternion Quaternion::operator- () const
-    {
-        return Quaternion(-w,-x,-y,-z);
-    }
-    //-----------------------------------------------------------------------
-    Real Quaternion::Dot (const Quaternion& rkQ) const
-    {
-        return w*rkQ.w+x*rkQ.x+y*rkQ.y+z*rkQ.z;
-    }
-    //-----------------------------------------------------------------------
-    Real Quaternion::Norm () const
-    {
-        return Math::Sqrt(w * w + x * x + y * y + z * z);
-    }
-    //-----------------------------------------------------------------------
     Quaternion Quaternion::Inverse () const
     {
         Real fNorm = w*w+x*x+y*y+z*z;
@@ -409,14 +370,6 @@ namespace Ogre {
 
     }
     //-----------------------------------------------------------------------
-	bool Quaternion::equals(const Quaternion& rhs, const Radian& tolerance) const
-	{
-        Real d = Dot(rhs);
-        Radian angle = Math::ACos(2.0f * d*d - 1.0f);
-
-		return Math::Abs(angle.valueRadians()) <= tolerance.valueRadians();
-	}
-    //-----------------------------------------------------------------------
     Quaternion Quaternion::Slerp (Real fT, const Quaternion& rkP,
         const Quaternion& rkQ, bool shortestPath)
     {
@@ -501,14 +454,6 @@ namespace Ogre {
         Quaternion kSlerpP = Slerp(fT, rkP, rkQ, shortestPath);
         Quaternion kSlerpQ = Slerp(fT, rkA, rkB);
         return Slerp(fSlerpT, kSlerpP ,kSlerpQ);
-    }
-    //-----------------------------------------------------------------------
-    Real Quaternion::normalise(void)
-    {
-        Real len = Norm();
-        Real factor = 1.0f / len;
-        *this = *this * factor;
-        return len;
     }
     //-----------------------------------------------------------------------
 	Radian Quaternion::getRoll(bool reprojectAxis) const

@@ -1,3 +1,10 @@
+# Ogre Core Resources
+[OgreInternal]
+APKFileSystem=/ShadowVolume
+APKFileSystem=/RTShaderLib/materials
+APKFileSystem=/RTShaderLib/GLSL
+APKFileSystem=/Terrain
+
 # Resources required by the sample browser and most samples.
 [Essential]
 APKZip=/packs/SdkTrays.zip
@@ -31,3 +38,5 @@ APKZip=/packs/DamagedHelmet.zip
 
 APKFileSystem=/PBR
 APKFileSystem=/HLMS
+APKFileSystem=/DeferredShadingMedia
+APKFileSystem=/DeferredShadingMedia/DeferredShading/post

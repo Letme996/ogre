@@ -122,39 +122,30 @@ namespace Ogre {
         mRenderSystem->_getStateCacheManager()->setTexParameteri(texTarget, GL_TEXTURE_BASE_LEVEL, 0);
         mRenderSystem->_getStateCacheManager()->setTexParameteri(texTarget, GL_TEXTURE_MAX_LEVEL, mNumMipmaps);
 
-        // Set some misc default parameters, these can of course be changed later.
-        mRenderSystem->_getStateCacheManager()->setTexParameteri(texTarget,
-                                            GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        mRenderSystem->_getStateCacheManager()->setTexParameteri(texTarget,
-                                            GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        mRenderSystem->_getStateCacheManager()->setTexParameteri(texTarget,
-                                            GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        mRenderSystem->_getStateCacheManager()->setTexParameteri(texTarget,
-                                            GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
         // Set up texture swizzling.
-        mRenderSystem->_getStateCacheManager()->setTexParameteri(texTarget, GL_TEXTURE_SWIZZLE_R, GL_RED);
-        mRenderSystem->_getStateCacheManager()->setTexParameteri(texTarget, GL_TEXTURE_SWIZZLE_G, GL_GREEN);
-        mRenderSystem->_getStateCacheManager()->setTexParameteri(texTarget, GL_TEXTURE_SWIZZLE_B, GL_BLUE);
-        mRenderSystem->_getStateCacheManager()->setTexParameteri(texTarget, GL_TEXTURE_SWIZZLE_A, GL_ALPHA);
-	
-        if (PixelUtil::isLuminance(mFormat) && (mRenderSystem->hasMinGLVersion(3, 3) || mRenderSystem->checkExtension("GL_ARB_texture_swizzle")))
+        typedef std::array<GLint, 4> SwizzleMask;
+        SwizzleMask swizzleMask;
+
+        if (PixelUtil::isLuminance(mFormat))
         {
             if (PixelUtil::getComponentCount(mFormat) == 2)
             {
-                mRenderSystem->_getStateCacheManager()->setTexParameteri(texTarget, GL_TEXTURE_SWIZZLE_R, GL_RED);
-                mRenderSystem->_getStateCacheManager()->setTexParameteri(texTarget, GL_TEXTURE_SWIZZLE_G, GL_RED);
-                mRenderSystem->_getStateCacheManager()->setTexParameteri(texTarget, GL_TEXTURE_SWIZZLE_B, GL_RED);
-                mRenderSystem->_getStateCacheManager()->setTexParameteri(texTarget, GL_TEXTURE_SWIZZLE_A, GL_GREEN);
+                swizzleMask = SwizzleMask{GL_RED, GL_RED, GL_RED, GL_GREEN};
             }
             else
             {
-                mRenderSystem->_getStateCacheManager()->setTexParameteri(texTarget, GL_TEXTURE_SWIZZLE_R, GL_RED);
-                mRenderSystem->_getStateCacheManager()->setTexParameteri(texTarget, GL_TEXTURE_SWIZZLE_G, GL_RED);
-                mRenderSystem->_getStateCacheManager()->setTexParameteri(texTarget, GL_TEXTURE_SWIZZLE_B, GL_RED);
-                mRenderSystem->_getStateCacheManager()->setTexParameteri(texTarget, GL_TEXTURE_SWIZZLE_A, GL_ONE);
+                swizzleMask = SwizzleMask{GL_RED, GL_RED, GL_RED, GL_ONE};
             }
         }
+        else if(mFormat == PF_A8)
+        {
+            swizzleMask = SwizzleMask{GL_ZERO, GL_ZERO, GL_ZERO, GL_RED};
+        }
+        else
+        {
+            swizzleMask = SwizzleMask{GL_RED, GL_GREEN, GL_BLUE, GL_ALPHA};
+        }
+        OGRE_CHECK_GL_ERROR(glTexParameteriv(texTarget, GL_TEXTURE_SWIZZLE_RGBA, swizzleMask.data()));
 
         GLenum format = GL3PlusPixelUtil::getGLInternalFormat(mFormat, mHwGamma);
         GLenum datatype = GL3PlusPixelUtil::getGLOriginDataType(mFormat);
@@ -262,6 +253,13 @@ namespace Ogre {
                 case TEX_TYPE_3D:
                     OGRE_CHECK_GL_ERROR(glTexStorage3D(GL_TEXTURE_3D, GLsizei(mNumMipmaps+1), format, GLsizei(width), GLsizei(height), GLsizei(depth)));
                     break;
+                case TEX_TYPE_EXTERNAL_OES:
+                    OGRE_EXCEPT(
+                        Exception::ERR_RENDERINGAPI_ERROR,
+                        "Attempt to store texture for unsupported TEX_TYPE_EXTERNAL_OES, should never happen",
+                        "GL3PlusTexture::createInternalResourcesImpl"
+                    );
+                    break;
                 }
             }
             else
@@ -322,6 +320,13 @@ namespace Ogre {
                                                              originFormat, datatype, NULL));
                         }
                         break;
+                    case TEX_TYPE_EXTERNAL_OES:
+                        OGRE_EXCEPT(
+                            Exception::ERR_RENDERINGAPI_ERROR,
+                            "Attempt to create mipmaps for unsupported TEX_TYPE_EXTERNAL_OES, should never happen",
+                            "GL3PlusTexture::createInternalResourcesImpl"
+                        );
+                        break;
                     default:
                         break;
                     };
@@ -358,34 +363,8 @@ namespace Ogre {
         mFormat = getBuffer(0,0)->getFormat();
     }
 
-    void GL3PlusTexture::loadImpl()
-    {
-        if (mUsage & TU_RENDERTARGET)
-        {
-            createRenderTexture();
-            return;
-        }
-
-        LoadedImages loadedImages;
-        // Now the only copy is on the stack and will be cleaned in case of
-        // exceptions being thrown from _loadImages
-        std::swap(loadedImages, mLoadedImages);
-
-        // Call internal _loadImages, not loadImage since that's external and
-        // will determine load status etc again
-        ConstImagePtrList imagePtrs;
-
-        for (size_t i = 0; i < loadedImages.size(); ++i)
-        {
-            imagePtrs.push_back(&loadedImages[i]);
-        }
-
-        _loadImages(imagePtrs);
-    }
-
     void GL3PlusTexture::freeInternalResourcesImpl()
     {
-        mSurfaceList.clear();
         if (GL3PlusStateCacheManager* stateCacheManager = mRenderSystem->_getStateCacheManager())
         {
             OGRE_CHECK_GL_ERROR(glDeleteTextures(1, &mTextureID));
@@ -421,7 +400,7 @@ namespace Ogre {
 
     void GL3PlusTexture::createShaderAccessPoint(uint bindPoint, TextureAccess access, 
                                                  int mipmapLevel, int textureArrayIndex, 
-                                                 PixelFormat* format)
+                                                 PixelFormat format)
     {
         GLenum GlAccess = 0;
 
@@ -436,25 +415,11 @@ namespace Ogre {
         case TA_READ_WRITE:
             GlAccess = GL_READ_WRITE;
             break;
-        default:
-            //TODO error handling
-            break;
         }
 
-        if (!format) format = &mFormat;
-        GLenum GlFormat = GL3PlusPixelUtil::getClosestGLImageInternalFormat(*format);
-
-        GLboolean isArrayTexture;
-
-        switch(mTextureType)
-        {
-        case TEX_TYPE_2D_ARRAY:
-            isArrayTexture = GL_TRUE;
-            break;
-        default:
-            isArrayTexture = GL_FALSE;
-            break;
-        }
+        if (format == PF_UNKNOWN) format = mFormat;
+        GLenum GlFormat = GL3PlusPixelUtil::getClosestGLImageInternalFormat(format);
+        GLboolean isArrayTexture = mTextureType == TEX_TYPE_2D_ARRAY;
 
         // TODO
         // * add memory barrier

@@ -35,7 +35,8 @@ String GLSLProgramWriter::TargetLanguage = "glsl";
 //-----------------------------------------------------------------------
 GLSLProgramWriter::GLSLProgramWriter() : mIsGLSLES(false)
 {
-    mGLSLVersion = Ogre::Root::getSingleton().getRenderSystem()->getNativeShadingLanguageVersion();
+    auto* rs = Root::getSingleton().getRenderSystem();
+    mGLSLVersion = rs ? rs->getNativeShadingLanguageVersion() : 120;
     initializeStringMaps();
 }
 
@@ -53,13 +54,14 @@ void GLSLProgramWriter::initializeStringMaps()
     mGpuConstTypeMap[GCT_FLOAT2] = "vec2";
     mGpuConstTypeMap[GCT_FLOAT3] = "vec3";
     mGpuConstTypeMap[GCT_FLOAT4] = "vec4";
-    mGpuConstTypeMap[GCT_SAMPLER1D] = mIsGLSLES ? "sampler2D" : "sampler1D";
+    mGpuConstTypeMap[GCT_SAMPLER1D] = "sampler1D";
     mGpuConstTypeMap[GCT_SAMPLER2D] = "sampler2D";
     mGpuConstTypeMap[GCT_SAMPLER2DARRAY] = "sampler2DArray";
     mGpuConstTypeMap[GCT_SAMPLER3D] = "sampler3D";
     mGpuConstTypeMap[GCT_SAMPLERCUBE] = "samplerCube";
     mGpuConstTypeMap[GCT_SAMPLER1DSHADOW] = "sampler1DShadow";
     mGpuConstTypeMap[GCT_SAMPLER2DSHADOW] = "sampler2DShadow";
+    mGpuConstTypeMap[GCT_SAMPLER_EXTERNAL_OES] = "samplerExternalOES";
     mGpuConstTypeMap[GCT_MATRIX_2X2] = "mat2";
     mGpuConstTypeMap[GCT_MATRIX_2X3] = "mat2x3";
     mGpuConstTypeMap[GCT_MATRIX_2X4] = "mat2x4";
@@ -103,10 +105,26 @@ void GLSLProgramWriter::initializeStringMaps()
 }
 
 //-----------------------------------------------------------------------
+const char* GLSLProgramWriter::getGL3CompatDefines()
+{
+    // Redefine texture functions to maintain reusability
+    return "#define texture1D texture\n"
+           "#define texture2D texture\n"
+           "#define shadow2DProj textureProj\n"
+           "#define texture3D texture\n"
+           "#define textureCube texture\n"
+           "#define texture2DLod textureLod\n";
+}
+
 void GLSLProgramWriter::writeSourceCode(std::ostream& os, Program* program)
 {
     // Write the current version (this force the driver to more fulfill the glsl standard)
     os << "#version "<< mGLSLVersion << std::endl;
+
+    if(mGLSLVersion > 120)
+    {
+        os << getGL3CompatDefines();
+    }
 
     // Generate source code header.
     writeProgramTitle(os, program);
@@ -223,7 +241,7 @@ void GLSLProgramWriter::writeMainSourceCode(std::ostream& os, Program* program)
                         os << "\t" << mGpuConstTypeMap[param->getType()] << " " << newVar << " = " << param->getName() << ";" << std::endl;
 
                         // From now on we replace it automatic
-                        param->_rename(newVar);
+                        param->_rename(newVar, true);
                         mLocalRenames.insert(newVar);
                     }
                 }
@@ -343,7 +361,7 @@ void GLSLProgramWriter::writeForwardDeclarations(std::ostream& os, Program* prog
         for ( ; itAtom != itAtomEnd; ++itAtom)
         {   
             // Skip non function invocation atoms.
-            if ((*itAtom)->getFunctionAtomType() != FunctionInvocation::Type)
+            if (!dynamic_cast<const FunctionInvocation*>(*itAtom))
                 continue;
 
             FunctionInvocation* pFuncInvoc = static_cast<FunctionInvocation*>(*itAtom);
@@ -380,7 +398,7 @@ void GLSLProgramWriter::writeInputParameters(std::ostream& os, Function* functio
     {       
         ParameterPtr pParam = *itParam;
         Parameter::Content paramContent = pParam->getContent();
-        String paramName = pParam->getName();
+        const String& paramName = pParam->getName();
 
         if (gpuType == GPT_FRAGMENT_PROGRAM)
         {
@@ -389,12 +407,6 @@ void GLSLProgramWriter::writeInputParameters(std::ostream& os, Function* functio
                 pParam->_rename("gl_PointCoord");
                 continue;
             }
-
-            // In the vertex and fragment program the variable names must match.
-            // Unfortunately now the input params are prefixed with an 'i' and output params with 'o'.
-            // Thats why we rename the params which are used in function atoms
-            paramName[0] = 'o';
-            pParam->_rename(paramName);
 
             // After GLSL 1.20 varying is deprecated
             if(mGLSLVersion <= 120 || (mGLSLVersion == 100 && mIsGLSLES))
@@ -502,9 +514,16 @@ void GLSLProgramWriter::writeOutParameters(std::ostream& os, Function* function,
                     os << "out\t";
                 }
 
+                // In the vertex and fragment program the variable names must match.
+                // Unfortunately now the input params are prefixed with an 'i' and output params with 'o'.
+                // Thats why we rename the params which are used in function atoms
+                String paramName = pParam->getName();
+                paramName[0] = 'i';
+                pParam->_rename(paramName);
+
                 os << mGpuConstTypeMap[pParam->getType()];
                 os << "\t";
-                os << pParam->getName();
+                os << paramName;
                 if (pParam->isArray() == true)
                 {
                     os << "[" << pParam->getSize() << "]";  
@@ -523,8 +542,7 @@ void GLSLProgramWriter::writeOutParameters(std::ostream& os, Function* function,
             }
             else
             {
-                os << "out vec4 fragColour;" << std::endl;
-                pParam->_rename("fragColour");
+                os << "out vec4\t" << pParam->getName() << ";" << std::endl;
             }
         }
     }
@@ -532,8 +550,8 @@ void GLSLProgramWriter::writeOutParameters(std::ostream& os, Function* function,
     if(gpuType == GPT_VERTEX_PROGRAM && !mIsGLSLES) // TODO: also use for GLSLES?
     {
         // Special case where gl_Position needs to be redeclared
-        if(Root::getSingleton().getRenderSystem()->getCapabilities()->hasCapability(RSC_GLSL_SSO_REDECLARE) &&
-           mGLSLVersion >= 150)
+        if (mGLSLVersion >= 150 && Root::getSingleton().getRenderSystem()->getCapabilities()->hasCapability(
+                                       RSC_GLSL_SSO_REDECLARE))
         {
             os << "out gl_PerVertex\n{\nvec4 gl_Position;\nfloat gl_PointSize;\nfloat gl_ClipDistance[];\n};\n" << std::endl;
         }

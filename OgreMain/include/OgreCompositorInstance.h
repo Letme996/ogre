@@ -107,9 +107,9 @@ namespace Ogre {
             /// Set state to SceneManager and RenderSystem
             virtual void execute(SceneManager *sm, RenderSystem *rs) = 0;
         };
-        typedef map<int, MaterialPtr>::type QuadMaterialMap;
+        typedef std::map<int, MaterialPtr> OGRE_DEPRECATED QuadMaterialMap;
         typedef std::pair<int, RenderSystemOperation*> RenderSystemOpPair;
-        typedef vector<RenderSystemOpPair>::type RenderSystemOpPairs;
+        typedef std::vector<RenderSystemOpPair> RenderSystemOpPairs;
         /** Operation setup for a RenderTarget (collected).
         */
         class TargetOperation
@@ -165,7 +165,7 @@ namespace Ogre {
             /** Whether shadows will be enabled */
             bool shadowsEnabled;
         };
-        typedef vector<TargetOperation>::type CompiledState;
+        typedef std::vector<TargetOperation> CompiledState;
         
         /** Set enabled flag. The compositor instance will only render if it is
             enabled, otherwise it is pass-through. Resources are only created if
@@ -324,12 +324,12 @@ namespace Ogre {
         /// Is this instance allocating resources?
         bool mAlive;
         /// Map from name->local texture.
-        typedef map<String,TexturePtr>::type LocalTextureMap;
+        typedef std::map<String,TexturePtr> LocalTextureMap;
         LocalTextureMap mLocalTextures;
         /// Store a list of MRTs we've created.
-        typedef map<String,MultiRenderTarget*>::type LocalMRTMap;
+        typedef std::map<String,MultiRenderTarget*> LocalMRTMap;
         LocalMRTMap mLocalMRTs;
-        typedef map<CompositionTechnique::TextureDefinition*, TexturePtr>::type ReserveTextureMap;
+        typedef std::map<CompositionTechnique::TextureDefinition*, TexturePtr> ReserveTextureMap;
         /** Textures that are not currently in use, but that we want to keep for now,
             for example if we switch techniques but want to keep all textures available
             in case we switch back. 
@@ -337,7 +337,7 @@ namespace Ogre {
         ReserveTextureMap mReserveTextures;
 
         /// Vector of listeners.
-        typedef vector<Listener*>::type Listeners;
+        typedef std::vector<Listener*> Listeners;
         Listeners mListeners;
         
         /// Previous instance (set by chain).
@@ -346,7 +346,7 @@ namespace Ogre {
         /** Collect rendering passes. Here, passes are converted into render target operations
             and queued with queueRenderSystemOp.
         */
-        virtual void collectPasses(TargetOperation &finalState, CompositionTargetPass *target);
+        virtual void collectPasses(TargetOperation &finalState, const CompositionTargetPass *target);
         
         /** Create a local dummy material with one technique but no passes.
             The material is detached from the Material Manager to make sure it is destroyed
@@ -361,6 +361,9 @@ namespace Ogre {
         /** Destroy local rendertextures and other resources.
         */
         void freeResources(bool forResizeOnly, bool clearReserveTextures);
+
+        CompositionTechnique::TextureDefinition*
+        resolveTexReference(const CompositionTechnique::TextureDefinition* texDef);
 
         /** Get RenderTarget for a named local texture.
         */
@@ -379,7 +382,7 @@ namespace Ogre {
         void queueRenderSystemOp(TargetOperation &finalState, RenderSystemOperation *op);
 
         /// Util method for assigning a local texture name to a MRT attachment
-        String getMRTTexLocalName(const String& baseName, size_t attachment);
+        static String getMRTTexLocalName(const String& baseName, size_t attachment);
 
         /** Search for options like AA and hardware gamma which we may want to 
             inherit from the main render target to which we're attached. 
@@ -391,6 +394,7 @@ namespace Ogre {
         void notifyCameraChanged(Camera* camera);
 
         friend class CompositorChain;
+        friend class Compositor;
     };
     /** @} */
     /** @} */

@@ -291,7 +291,7 @@ namespace Ogre
 
         static const size_t LOD_MORPH_CUSTOM_PARAM;
 
-        typedef vector<Real>::type RealVector;
+        typedef std::vector<Real> RealVector;
 
         /** An instance of a layer, with specific texture names
         */
@@ -305,7 +305,7 @@ namespace Ogre
             LayerInstance()
                 : worldSize(100) {}
         };
-        typedef vector<LayerInstance>::type LayerInstanceList;
+        typedef std::vector<LayerInstance> LayerInstanceList;
 
         /// The alignment of the terrain
         enum Alignment
@@ -588,10 +588,10 @@ namespace Ogre
                 uint16 minBatchSize);
 
         protected:
-            typedef list<HardwareVertexBufferSharedPtr>::type VBufList;
+            typedef std::list<HardwareVertexBufferSharedPtr> VBufList;
             VBufList mFreePosBufList;
             VBufList mFreeDeltaBufList;
-            typedef map<uint32, HardwareIndexBufferSharedPtr>::type IBufMap;
+            typedef std::map<uint32, HardwareIndexBufferSharedPtr> IBufMap;
             IBufMap mSharedIBufMap;
 
             uint32 hashIndexBuffer(uint16 batchSize, 
@@ -816,12 +816,7 @@ namespace Ogre
             of the terrain
         */
         float getHeightAtWorldPosition(Real x, Real y, Real z) const;
-
-        /** Get the height data for a given world position (projecting the point
-        down on to the terrain). 
-        @param pos Position in world space. Positions will be clamped to the edge
-        of the terrain
-        */
+        /// @overload
         float getHeightAtWorldPosition(const Vector3& pos) const;
 
         /** Get a pointer to all the delta data for this terrain.
@@ -864,49 +859,36 @@ namespace Ogre
         @param[out] outVec
         */
         void getTerrainVector(const Vector3& inVec, Vector3* outVec) const;
+        /// @overload
+        void getTerrainVector(Real x, Real y, Real z, Vector3* outVec) const;
+
         /** Translate a vector from world space to local terrain space based on a specified alignment.
         @param inVec The vector in basis space, where x/y represents the 
         terrain plane and z represents the up vector
         @param[out] outVec
+        @param align The alignment of the terrain
         */
         void getTerrainVectorAlign(const Vector3& inVec, Alignment align, Vector3* outVec) const;
-
-        /** Translate a vector from world space to local terrain space based on the alignment options.
-        @param x, y, z The vector in basis space, where x/y represents the 
-        terrain plane and z represents the up vector
-        @param[out] outVec
-        */
-        void getTerrainVector(Real x, Real y, Real z, Vector3* outVec) const;
-        /** Translate a vector from world space to local terrain space based on a specified alignment.
-        @param x, y, z The vector in world space, where x/y represents the 
-        terrain plane and z represents the up vector
-        @param[out] outVec
-        */
+        /// @overload
         void getTerrainVectorAlign(Real x, Real y, Real z, Alignment align, Vector3* outVec) const;
 
         /** Translate a vector into world space based on the alignment options.
         @param inVec The vector in basis space, where x/y represents the 
         terrain plane and z represents the up vector
+        @param[out] outVec
         */
         void getVector(const Vector3& inVec, Vector3* outVec) const;
+        /// @overload
+        void getVector(Real x, Real y, Real z, Vector3* outVec) const;
+
         /** Translate a vector into world space based on a specified alignment.
         @param inVec The vector in basis space, where x/y represents the 
         terrain plane and z represents the up vector
         @param[out] outVec
+        @param align The alignment of the terrain
         */
         void getVectorAlign(const Vector3& inVec, Alignment align, Vector3* outVec) const;
-
-        /** Translate a vector into world space based on the alignment options.
-        @param x, y, z The vector in basis space, where x/y represents the 
-        terrain plane and z represents the up vector
-        @param[out] outVec
-        */
-        void getVector(Real x, Real y, Real z, Vector3* outVec) const;
-        /** Translate a vector into world space based on a specified alignment.
-        @param x, y, z The vector in basis space, where x/y represents the 
-        terrain plane and z represents the up vector
-        @param[out] outVec
-        */
+        /// @overload
         void getVectorAlign(Real x, Real y, Real z, Alignment align, Vector3* outVec) const;
 
 
@@ -918,13 +900,7 @@ namespace Ogre
         @param outWSpos World space output position (setup according to current alignment). 
         */
         void getPosition(const Vector3& TSpos, Vector3* outWSpos) const;
-        /** Convert a position from terrain basis space to world space. 
-        @param x,y,z Terrain space position, where (0,0) is the bottom-left of the
-        terrain, and (1,1) is the top-right. The Z coordinate is in absolute
-        height units.
-        @note This position is relative to Terrain::getPosition
-        @param outWSpos World space output position (setup according to current alignment). 
-        */
+        /// @overload
         void getPosition(Real x, Real y, Real z, Vector3* outWSpos) const;
 
         /** Convert a position from world space to terrain basis space. 
@@ -934,26 +910,17 @@ namespace Ogre
         height units.
         */
         void getTerrainPosition(const Vector3& WSpos, Vector3* outTSpos) const;
-        /** Convert a position from world space to terrain basis space. 
-        @param x,y,z World space position (setup according to current alignment). 
-        @param outTSpos Terrain space output position, where (0,0) is the bottom-left of the
-        terrain, and (1,1) is the top-right. The Z coordinate is in absolute
-        height units.
-        */
+        /// @overload
         void getTerrainPosition(Real x, Real y, Real z, Vector3* outTSpos) const;
         /** Convert a position from terrain basis space to world space based on a specified alignment. 
         @param TSpos Terrain space position, where (0,0) is the bottom-left of the
             terrain, and (1,1) is the top-right. The Z coordinate is in absolute
             height units.
         @param outWSpos World space output position (setup according to alignment). 
+        @param align The alignment of the terrain
         */
         void getPositionAlign(const Vector3& TSpos, Alignment align, Vector3* outWSpos) const;
-        /** Convert a position from terrain basis space to world space based on a specified alignment. 
-        @param x,y,z Terrain space position, where (0,0) is the bottom-left of the
-        terrain, and (1,1) is the top-right. The Z coordinate is in absolute
-        height units.
-        @param outWSpos World space output position (setup according to alignment). 
-        */
+        /// @overload
         void getPositionAlign(Real x, Real y, Real z, Alignment align, Vector3* outWSpos) const;
 
         /** Convert a position from world space to terrain basis space based on a specified alignment. 
@@ -961,14 +928,10 @@ namespace Ogre
         @param outTSpos Terrain space output position, where (0,0) is the bottom-left of the
         terrain, and (1,1) is the top-right. The Z coordinate is in absolute
         height units.
+        @param align The alignment of the terrain
         */
         void getTerrainPositionAlign(const Vector3& WSpos, Alignment align, Vector3* outTSpos) const;
-        /** Convert a position from world space to terrain basis space based on a specified alignment. 
-        @param x,y,z World space position (setup according to alignment). 
-        @param outTSpos Terrain space output position, where (0,0) is the bottom-left of the
-        terrain, and (1,1) is the top-right. The Z coordinate is in absolute
-        height units.
-        */
+        /// @overload
         void getTerrainPositionAlign(Real x, Real y, Real z, Alignment align, Vector3* outTSpos) const;
 
 
@@ -1692,8 +1655,6 @@ namespace Ogre
         */
         void getPointAlign(long x, long y, float height, Alignment align, Vector3* outpos) const;
         void calculateCurrentLod(Viewport* vp);
-        /// Test a single quad of the terrain for ray intersection.
-        std::pair<bool, Vector3> checkQuadIntersection(int x, int y, const Ray& ray); //const;
 
         /// Delete blend maps for all layers >= lowIndex
         void deleteBlendMaps(uint8 lowIndex);
@@ -1826,10 +1787,10 @@ namespace Ogre
 
         uint16 mLayerBlendMapSize;
         uint16 mLayerBlendMapSizeActual;
-        typedef vector<uint8*>::type BytePointerList;
+        typedef std::vector<uint8*> BytePointerList;
         /// Staging post for blend map data
         BytePointerList mCpuBlendMapStorage;
-        typedef vector<TexturePtr>::type TexturePtrList;
+        typedef std::vector<TexturePtr> TexturePtrList;
         TexturePtrList mBlendTextureList;
         TerrainLayerBlendMapList mLayerBlendMapList;
 
@@ -1898,6 +1859,9 @@ namespace Ogre
         int getHighestLodPrepared() const { return (mLodManager) ? mLodManager->getHighestLodPrepared() : -1; };
         int getHighestLodLoaded() const { return (mLodManager) ? mLodManager->getHighestLodLoaded() : -1; };
         int getTargetLodLevel() const { return (mLodManager) ? mLodManager->getTargetLodLevel() : -1; };
+    private:
+        /// Test a single quad of the terrain for ray intersection.
+        OGRE_FORCE_INLINE std::pair<bool, Vector3> checkQuadIntersection(int x, int y, const Ray& ray) const;
     };
 
 

@@ -28,8 +28,19 @@ THE SOFTWARE.
 #include "OgreStableHeaders.h"
 #include "OgreScriptLexer.h"
 
-namespace Ogre{
-    ScriptTokenListPtr ScriptLexer::tokenize(const String &str, const String &source)
+namespace Ogre {
+    ScriptTokenListPtr ScriptLexer::tokenize(const String &str, const String& source)
+    {
+        String error;
+        ScriptTokenListPtr ret = _tokenize(str, source.c_str(), error);
+
+        if (!error.empty())
+            LogManager::getSingleton().logError("ScriptLexer - " + error);
+
+        return ret;
+    }
+
+    ScriptTokenListPtr ScriptLexer::_tokenize(const String &str, const char* source, String& error)
     {
         // State enums
         enum{ READY = 0, COMMENT, MULTICOMMENT, WORD, QUOTE, VAR, POSSIBLECOMMENT };
@@ -39,7 +50,7 @@ namespace Ogre{
         char c = 0, lastc = 0;
 
         String lexeme;
-        uint32 line = 1, state = READY, lastQuote = 0;
+        uint32 line = 1, state = READY, lastQuote = 0, firstOpenBrace = 0, braceLayer = 0;
         ScriptTokenListPtr tokens(OGRE_NEW_T(ScriptTokenList, MEMCATEGORY_GENERAL)(), SPFM_DELETE_T);
 
         // Iterate over the input
@@ -51,7 +62,31 @@ namespace Ogre{
 
             if(c == quote)
                 lastQuote = line;
+            
+            if(state == READY || state == WORD || state == VAR)
+            {
+                if(c == openbrace)
+                {
+                    if(braceLayer == 0)
+                        firstOpenBrace = line;
+                    
+                    braceLayer ++;
+                }
+                else if(c == closebrace)
+                {
+                    if (braceLayer == 0)
+                    {
+                        error = StringUtil::format(
+                            "no matching open bracket '{' found for close bracket '}' at %s:%d", source,
+                            line);
+                        return tokens;
+                    }
 
+                    braceLayer --;
+                }
+            }
+            
+            
             switch(state)
             {
             case READY:
@@ -215,17 +250,28 @@ namespace Ogre{
         {
             if(state == QUOTE)
             {
-                OGRE_EXCEPT(Exception::ERR_INVALID_STATE, 
-                    Ogre::String("no matching \" found for \" at line ") + 
-                    Ogre::StringConverter::toString(lastQuote),
-                    "ScriptLexer::tokenize");
+                error = StringUtil::format("no matching \" found for \" at %s:%d", source, lastQuote);
+                return tokens;
             }
         }
-
+        
+        // Check that all opened brackets have been closed
+        if (braceLayer == 1)
+        {
+            error = StringUtil::format("no matching closing bracket '}' for open bracket '{' at %s:%d",
+                                       source, firstOpenBrace);
+        }
+        else if (braceLayer > 1)
+        {
+            error = StringUtil::format(
+                "too many open brackets (%d) '{' without matching closing bracket '}' in %s", braceLayer,
+                source);
+        }
+       
         return tokens;
     }
 
-    void ScriptLexer::setToken(const Ogre::String &lexeme, Ogre::uint32 line, const String &source, Ogre::ScriptTokenList *tokens)
+    void ScriptLexer::setToken(const Ogre::String &lexeme, Ogre::uint32 line, const char* source, ScriptTokenList *tokens)
     {
         const char openBracket = '{', closeBracket = '}', colon = ':',
             quote = '\"', var = '$';
@@ -249,7 +295,7 @@ namespace Ogre{
             token->type = TID_RBRACKET;
         else if(lexeme.size() == 1 && lexeme[0] == colon)
             token->type = TID_COLON;
-        else if(lexeme[0] == var)
+        else if(lexeme.size() > 1 && lexeme[0] == var)
             token->type = TID_VARIABLE;
         else
         {

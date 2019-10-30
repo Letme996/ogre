@@ -45,6 +45,7 @@ THE SOFTWARE.
 #include "OgreMaterialManager.h"
 #include "OgreLodStrategyManager.h"
 #include "OgreSkeleton.h"
+#include "OgreKeyFrame.h"
 
 
 //#define I_HAVE_LOT_OF_FREE_TIME
@@ -379,7 +380,7 @@ void MeshSerializerTests::assertMeshClone(Mesh* a, Mesh* b, MeshVersion version 
         SubMesh* bSubmesh = b->getSubMesh(i);
 
         EXPECT_TRUE(aSubmesh->getMaterialName() == bSubmesh->getMaterialName());
-        EXPECT_TRUE(aSubmesh->isMatInitialised() == bSubmesh->isMatInitialised());
+        EXPECT_EQ(bool(aSubmesh->getMaterial()), bool(bSubmesh->getMaterial()));
         EXPECT_TRUE(aSubmesh->useSharedVertices == bSubmesh->useSharedVertices);
         EXPECT_TRUE(aSubmesh->getVertexAnimationIncludesNormals() == bSubmesh->getVertexAnimationIncludesNormals());
         EXPECT_TRUE(aSubmesh->getVertexAnimationType() == bSubmesh->getVertexAnimationType());
@@ -544,14 +545,14 @@ bool MeshSerializerTests::isContainerClone(T& a, T& b)
 }
 //--------------------------------------------------------------------------
 template<typename K, typename V>
-bool MeshSerializerTests::isHashMapClone(const OGRE_HashMap<K, V>& a, const OGRE_HashMap<K, V>& b)
+bool MeshSerializerTests::isHashMapClone(const std::unordered_map<K, V>& a, const std::unordered_map<K, V>& b)
 {
     // if you recreate a HashMap with same elements, then iteration order may differ!
     // So isContainerClone is not always working on HashMap.
     if (a.size() != b.size()) {
         return false;
     }
-    typename OGRE_HashMap<K, V>::const_iterator it, itFind, itEnd;
+    typename std::unordered_map<K, V>::const_iterator it, itFind, itEnd;
     it = a.begin();
     itEnd = a.end();
     for (; it != itEnd; it++) {

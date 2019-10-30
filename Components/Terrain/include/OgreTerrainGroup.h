@@ -33,6 +33,7 @@ THE SOFTWARE.
 #include "OgreTerrain.h"
 #include "OgreWorkQueue.h"
 #include "OgreIteratorWrappers.h"
+#include "OgreConfigFile.h"
 
 namespace Ogre
 {
@@ -83,7 +84,7 @@ namespace Ogre
         /** Alternate constructor.
         @remarks
             You can ONLY use this constructor if you subsequently call loadGroupDefinition
-            to populate the rest.
+            or loadLegacyTerrain to populate the rest.
         */
         TerrainGroup(SceneManager* sm);
         virtual ~TerrainGroup();
@@ -257,6 +258,18 @@ namespace Ogre
         */
         virtual void loadTerrain(long x, long y, bool synchronous = false);
         
+        /** Load a terrain.cfg as used by the terrain scene manager into a single terrain slot
+         *
+         * automatically configures the SM2Profile if it is used.
+         * @attention not all of the legacy parameters/ parameter combinations are supported
+         * @param cfgFilename .cfg file that specifices what textures/scale/mipmaps/etc to use.
+         * @param x, y The coordinates of the terrain slot relative to the centre slot (signed).
+         */
+        void loadLegacyTerrain(const String& cfgFilename, long x = 0, long y = 0, bool synchronous = true);
+
+        /// @overload
+        void loadLegacyTerrain(const ConfigFile& cfg, long x = 0, long y = 0, bool synchronous = true);
+
         /** Unload a specific terrain slot.
         @remarks
             This destroys the Terrain instance but retains the slot definition (so
@@ -417,7 +430,7 @@ namespace Ogre
          */
         RayResult rayIntersects(const Ray& ray, Real distanceLimit = 0) const; 
         
-        typedef vector<Terrain*>::type TerrainList; 
+        typedef std::vector<Terrain*> TerrainList; 
         /** Test intersection of a box with the terrain. 
         @remarks
             Tests an AABB for overlap with a terrain bounding box. Note that this does not mean that the box
@@ -457,7 +470,7 @@ namespace Ogre
         bool isDerivedDataUpdateInProgress() const;
 
         /// Packed map, signed 16 bits for each axis from -32767 to +32767
-        typedef map<uint32, TerrainSlot*>::type TerrainSlotMap;
+        typedef std::map<uint32, TerrainSlot*> TerrainSlotMap;
         typedef MapIterator<TerrainSlotMap> TerrainIterator;
         typedef ConstMapIterator<TerrainSlotMap> ConstTerrainIterator;
 

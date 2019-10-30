@@ -30,20 +30,12 @@ THE SOFTWARE.
 
 #include "OgrePropertyPrerequisites.h"
 #include "OgreAny.h"
-#include "OgreIteratorWrappers.h"
 #include "OgreString.h"
 #include "OgreException.h"
 #include "OgreQuaternion.h"
 #include "OgreMatrix4.h"
 
-#if OGRE_THREAD_PROVIDER == 1
-#include <boost/bind.hpp>
-#include <boost/function.hpp>
-#elif __cplusplus >= 201103L || (defined(_MSC_VER) && _MSC_VER >= 1800)
 #include <functional>
-#else
-#include <tr1/functional>
-#endif
 
 /** \addtogroup Optional
 *  @{
@@ -81,9 +73,9 @@ THE SOFTWARE.
     PropertyDefMap::iterator defi = propertyDefs.find("name");
     if (defi == propertyDefs.end())
     {
-        defi = propertyDefs.insert(PropertyDefMap::value_type("name", 
+        defi = propertyDefs.emplace("name",
             PropertyDef("name", 
-                "The name of the object.", PROP_STRING))).first;
+                "The name of the object.", PROP_STRING)).first;
     }
     // This has established the property definition, and its description.
     // Now, we need to 'wire' a property instance for this object instance
@@ -91,8 +83,8 @@ THE SOFTWARE.
     // 'props' is a PropertySet, specific to the instance
     props.addProperty(
         OGRE_NEW Property<String>(&(defi->second),
-            boost::bind(&Foo::getName, inst), 
-            boost::bind(&Foo::setName, inst, _1)));
+            std::bind(&Foo::getName, inst),
+            std::bind(&Foo::setName, inst, _1)));
 
     @endcode
 
@@ -102,13 +94,7 @@ THE SOFTWARE.
 /** @} */
 namespace Ogre
 {
-#if OGRE_THREAD_PROVIDER == 1
-    using boost::function;
-#elif __cplusplus >= 201103L || (defined(_MSC_VER) && _MSC_VER >= 1800)
     using std::function;
-#else
-    using std::tr1::function;
-#endif
 
     /** \addtogroup Optional
     *  @{
@@ -199,7 +185,7 @@ namespace Ogre
     };
 
     /// Map from property name to shared definition
-    typedef map<String, PropertyDef>::type PropertyDefMap;
+    typedef std::map<String, PropertyDef> PropertyDefMap;
 
     /** Base interface for an instance of a property.
     */
@@ -284,7 +270,7 @@ namespace Ogre
         Ogre::Any val;
     };
     /// Defines a transferable map of properties using wrapped value types (Ogre::Any)
-    typedef map<String, PropertyValue>::type PropertyValueMap;
+    typedef std::map<String, PropertyValue> PropertyValueMap;
 
 
     /** Defines a complete set of properties for a single object instance.
@@ -316,10 +302,7 @@ namespace Ogre
         /** Removes the named property from the property set. */
         void removeProperty(const String& name);
 
-        typedef map<String, PropertyBase*>::type PropertyMap;
-        typedef Ogre::MapIterator<PropertyMap> PropertyIterator;
-        /// Get an iterator over the available properties
-        PropertyIterator getPropertyIterator();
+        typedef std::map<String, PropertyBase*> PropertyMap;
 
         /** Gets an independently usable collection of property values from the
         current state.

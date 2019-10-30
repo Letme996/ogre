@@ -28,7 +28,6 @@ GLSLProgramCommon::GLSLProgramCommon(GLSLShaderCommon* vertexShader)
       mUniformRefsBuilt(false),
       mGLProgramHandle(0),
       mLinked(false),
-      mTriedToLinkAndFailed(false),
       mSkeletalAnimation(false)
 {
     // init mCustomAttributesIndexes
@@ -108,28 +107,36 @@ void GLSLProgramCommon::extractLayoutQualifiers(void)
             // It should contain 3 parts, i.e. "attribute vec4 vertex".
             break;
         }
-        if (parts[0] == "out")
+        size_t attrStart = 0;
+        if (parts.size() == 4)
         {
-            // This is an output attribute, skip it
-            continue;
+            if( parts[0] == "flat" || parts[0] == "smooth"|| parts[0] == "perspective")
+            {
+                // Skip the interpolation qualifier
+                attrStart = 1;
+            }
         }
 
-        String attrName = parts[2];
-        String::size_type uvPos = attrName.find("uv");
-
-        if(uvPos == 0)
-            semantic = getAttributeSemanticEnum("uv0"); // treat "uvXY" as "uv0"
-        else
-            semantic = getAttributeSemanticEnum(attrName);
-
-        // Find the texture unit index.
-        if (uvPos == 0)
+        // Skip output attribute
+        if (parts[attrStart] != "out")
         {
-            String uvIndex = attrName.substr(uvPos + 2, attrName.length() - 2);
-            index = StringConverter::parseInt(uvIndex);
-        }
+            String attrName = parts[attrStart + 2];
+            String::size_type uvPos = attrName.find("uv");
 
-        mCustomAttributesIndexes[semantic - 1][index] = attrib;
+            if(uvPos == 0)
+                semantic = getAttributeSemanticEnum("uv0"); // treat "uvXY" as "uv0"
+            else
+                semantic = getAttributeSemanticEnum(attrName);
+
+            // Find the texture unit index.
+            if (uvPos == 0)
+            {
+                String uvIndex = attrName.substr(uvPos + 2, attrName.length() - 2);
+                index = StringConverter::parseInt(uvIndex);
+            }
+
+            mCustomAttributesIndexes[semantic - 1][index] = attrib;
+        }
 
         currPos = shaderSource.find("layout", currPos);
     }
@@ -231,5 +238,66 @@ int32 GLSLProgramCommon::getFixedAttributeIndex(VertexElementSemantic semantic, 
         return attributeIndex[semantic] + index;
 
     return attributeIndex[semantic];
+}
+
+void GLSLProgramCommon::updateUniformBlocks()
+{
+    //TODO Maybe move to GpuSharedParams?
+    //TODO Support uniform block arrays - need to figure how to do this via material.
+
+    // const GpuProgramParameters::GpuSharedParamUsageList& sharedParams = params->getSharedParameters();
+
+    // Iterate through the list of uniform blocks and update them as needed.
+    for (const auto& currentPair : mSharedParamsBufferMap)
+    {
+        // force const call to get*Pointer
+        const GpuSharedParameters* paramsPtr = currentPair.first.get();
+
+        if (!paramsPtr->isDirty()) continue;
+
+        //FIXME Possible buffer does not exist if no associated uniform block.
+        HardwareUniformBuffer* hwGlBuffer = currentPair.second.get();
+
+        //FIXME does not check if current progrtype, or if shared param is active
+
+        for (const auto& parami : paramsPtr->getConstantDefinitions().map)
+        {
+            const GpuConstantDefinition& param = parami.second;
+
+            BaseConstantType baseType = GpuConstantDefinition::getBaseType(param.constType);
+
+            // NOTE: the naming is backward. this is the logical index
+            size_t index =  param.physicalIndex;
+
+            const void* dataPtr;
+            switch (baseType)
+            {
+            case BCT_FLOAT:
+                dataPtr = paramsPtr->getFloatPointer(index);
+                break;
+            case BCT_UINT:
+            case BCT_BOOL:
+            case BCT_INT:
+                dataPtr = paramsPtr->getIntPointer(index);
+                break;
+            case BCT_DOUBLE:
+                dataPtr = paramsPtr->getDoublePointer(index);
+                break;
+            case BCT_SAMPLER:
+            case BCT_SUBROUTINE:
+                //TODO implement me!
+            default:
+                //TODO error handling
+                continue;
+            }
+
+            // in bytes
+            size_t length = param.arraySize * param.elementSize * 4;
+
+            // NOTE: the naming is backward. this is the physical offset in bytes
+            size_t offset = param.logicalIndex;
+            hwGlBuffer->writeData(offset, length, dataPtr);
+        }
+    }
 }
 } /* namespace Ogre */

@@ -11,8 +11,6 @@
 # MeshLodGenerator optional component
 ############################################################
 
-PROJECT(OgreMeshLodGenerator)
-
 # define header and source files for the library
 file(GLOB HEADER_FILES "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
 file(GLOB SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
@@ -20,21 +18,19 @@ file(GLOB SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 # Add needed definitions 
 add_definitions(-DOGRE_MESHLODGENERATOR_EXPORTS ${OGRE_VISIBILITY_FLAGS})
 
-# include headers
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-# repeat for PCH
-include_directories("${OGRE_SOURCE_DIR}/OgreMain/include" "${OGRE_BINARY_DIR}/include")
-
 # setup target
 get_native_precompiled_header(OgreMeshLodGenerator)
 add_library(OgreMeshLodGenerator ${OGRE_COMP_LIB_TYPE} ${OgreMeshLodGenerator_pch} ${HEADER_FILES} ${SOURCE_FILES} ${PLATFORM_HEADER_FILES} ${PLATFORM_SOURCE_FILES})
 set_target_properties(OgreMeshLodGenerator PROPERTIES VERSION ${OGRE_SOVERSION} SOVERSION ${OGRE_SOVERSION})
-target_link_libraries(OgreMeshLodGenerator OgreMain)
-add_native_precompiled_header(OgreMeshLodGenerator "${CMAKE_CURRENT_SOURCE_DIR}/src/OgreMeshLodPrecompiledHeaders.h")
+target_link_libraries(OgreMeshLodGenerator PUBLIC OgreMain)
 
-if (OGRE_CONFIG_THREADS)
-  target_link_libraries(OgreMeshLodGenerator ${OGRE_THREAD_LIBRARIES})
-endif ()
+target_include_directories(OgreMeshLodGenerator PUBLIC 
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  $<INSTALL_INTERFACE:include/OGRE/MeshLodGenerator>)
+
+# repeat for PCH
+include_directories("${PROJECT_SOURCE_DIR}/OgreMain/include" "${PROJECT_BINARY_DIR}/include" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+add_native_precompiled_header(OgreMeshLodGenerator "${CMAKE_CURRENT_SOURCE_DIR}/src/OgreMeshLodPrecompiledHeaders.h")
 
 # install 
 ogre_config_framework(OgreMeshLodGenerator)

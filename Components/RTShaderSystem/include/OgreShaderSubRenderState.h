@@ -103,7 +103,7 @@ public:
     @param source The auto parameter source.
     @param pLightList The light list used in the current rendering context.
     */
-    virtual void updateGpuProgramsParams(Renderable* rend, Pass* pass,  const AutoParamDataSource* source,  const LightList* pLightList) { }
+    virtual void updateGpuProgramsParams(Renderable* rend, const Pass* pass,  const AutoParamDataSource* source,  const LightList* pLightList) { }
 
     /** Called before adding this sub render state to the given render state.
     Allows this sub render state class to configure specific parameters depending on source pass or parent render state.
@@ -154,11 +154,11 @@ private:
     
 };
 
-typedef vector<SubRenderState*>::type               SubRenderStateList;
+typedef std::vector<SubRenderState*>               SubRenderStateList;
 typedef SubRenderStateList::iterator                SubRenderStateListIterator;
 typedef SubRenderStateList::const_iterator          SubRenderStateListConstIterator;
 
-typedef set<SubRenderState*>::type                  SubRenderStateSet;
+typedef std::set<SubRenderState*>                  SubRenderStateSet;
 typedef SubRenderStateSet::iterator                 SubRenderStateSetIterator;
 typedef SubRenderStateSet::const_iterator           SubRenderStateSetConstIterator;
 
@@ -240,7 +240,7 @@ public:
     
     /** Create an instance of the SubRenderState sub class it suppose to create.    
     */
-    virtual SubRenderState* createInstance();
+    virtual SubRenderState* createInstance() OGRE_NODISCARD;
 
     /** Create an instance of the SubRenderState based on script properties.    
     This method is called in the context of script parsing and let this factory
@@ -250,7 +250,8 @@ public:
     @param pass The pass that is the parent context of this node.
     @param translator The translator instance holding existing scripts.
     */
-    virtual SubRenderState* createInstance(ScriptCompiler* compiler, PropertyAbstractNode* prop, Pass* pass, SGScriptTranslator* translator) { return NULL; }
+    virtual SubRenderState* createInstance(ScriptCompiler* compiler, PropertyAbstractNode* prop, Pass* pass, SGScriptTranslator* translator) OGRE_NODISCARD 
+    { return NULL; }
 
     /** Create an instance of the SubRenderState based on script properties.    
     This method is called in the context of script parsing and let this factory
@@ -260,7 +261,8 @@ public:
     @param texState The pass that is the parent context of this node.
     @param translator The translator instance holding existing scripts.
     */
-    virtual SubRenderState* createInstance(ScriptCompiler* compiler, PropertyAbstractNode* prop, TextureUnitState* texState, SGScriptTranslator* translator) { return NULL; }
+    virtual SubRenderState* createInstance(ScriptCompiler* compiler, PropertyAbstractNode* prop, TextureUnitState* texState, SGScriptTranslator* translator) OGRE_NODISCARD 
+    { return NULL; }
 
     /** Retrieve the previous instance the SRS in the script translator or
     * create a new instance if not found 

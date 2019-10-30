@@ -53,9 +53,9 @@ namespace Ogre
     {
 
     public:
-        typedef vector<Vector3>::type               VertexList;
+        typedef std::vector<Vector3>               VertexList;
 
-        typedef multimap<Vector3, Vector3>::type        EdgeMap;
+        typedef std::multimap<Vector3, Vector3>        EdgeMap;
         typedef std::pair< Vector3, Vector3>        Edge;
 
     protected:
@@ -132,6 +132,8 @@ namespace Ogre
         */
         bool operator != (const Polygon& rhs) const
         { return !( *this == rhs ); }
+
+        Polygon& operator=(const Ogre::Polygon&) ;
 
         /** Prints out the polygon data.
         */

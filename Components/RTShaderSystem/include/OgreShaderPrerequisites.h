@@ -65,6 +65,7 @@ class RenderState;
 class Parameter;
 class UniformParameter;
 class Function;
+class FunctionStageRef;
 class FFPRenderStateBuilder;
 class ShaderGenerator;
 class SGMaterialSerializerListener;
@@ -73,7 +74,7 @@ class ProgramWriterManager;
 
 typedef shared_ptr<Parameter>        ParameterPtr;
 typedef shared_ptr<UniformParameter> UniformParameterPtr;
-typedef vector<ParameterPtr>::type  ShaderParameterList;
+typedef std::vector<ParameterPtr>  ShaderParameterList;
 
 // Vertex shader output parameters compact policy.
 enum VSOutputCompactPolicy

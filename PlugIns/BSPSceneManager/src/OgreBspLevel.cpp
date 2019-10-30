@@ -26,7 +26,6 @@ THE SOFTWARE.
 -----------------------------------------------------------------------------
 */
 #include "OgreBspLevel.h"
-#include "OgreBspResourceManager.h"
 #include "OgreException.h"
 #include "OgreMaterial.h"
 #include "OgreMaterialManager.h"
@@ -224,14 +223,10 @@ namespace Ogre {
         /// Create vertex declaration
         VertexDeclaration* decl = mVertexData->vertexDeclaration;
         size_t offset = 0;
-        decl->addElement(0, offset, VET_FLOAT3, VES_POSITION);
-        offset += VertexElement::getTypeSize(VET_FLOAT3);
-        decl->addElement(0, offset, VET_FLOAT3, VES_NORMAL);
-        offset += VertexElement::getTypeSize(VET_FLOAT3);
-        decl->addElement(0, offset, VET_COLOUR, VES_DIFFUSE);
-        offset += VertexElement::getTypeSize(VET_COLOUR);
-        decl->addElement(0, offset, VET_FLOAT2, VES_TEXTURE_COORDINATES, 0);
-        offset += VertexElement::getTypeSize(VET_FLOAT2);
+        offset += decl->addElement(0, offset, VET_FLOAT3, VES_POSITION).getSize();
+        offset += decl->addElement(0, offset, VET_FLOAT3, VES_NORMAL).getSize();
+        offset += decl->addElement(0, offset, VET_COLOUR, VES_DIFFUSE).getSize();
+        offset += decl->addElement(0, offset, VET_FLOAT2, VES_TEXTURE_COORDINATES, 0).getSize();
         decl->addElement(0, offset, VET_FLOAT2, VES_TEXTURE_COORDINATES, 1);
 
         // Build initial patches - we need to know how big the vertex buffer needs to be
@@ -482,7 +477,7 @@ namespace Ogre {
             }
             else
             {
-                LogManager::getSingleton().logMessage("!!! Unknown Face Type !!!", LML_CRITICAL);
+                LogManager::getSingleton().logError("Unknown Face Type");
             }
 
             // progress reporting
@@ -929,7 +924,7 @@ namespace Ogre {
         MovableToNodeMap::iterator i = mMovableToNodeMap.find(mov);
         if (i != mMovableToNodeMap.end())
         {
-            list<BspNode*>::type::iterator nodeit, nodeitend;
+            std::list<BspNode*>::iterator nodeit, nodeitend;
             nodeitend = i->second.end();
             for (nodeit = i->second.begin(); nodeit != nodeitend; ++nodeit)
             {
@@ -950,9 +945,7 @@ namespace Ogre {
         {
             // Add to movable->node map
             // Insert all the time, will get current if already there
-            std::pair<MovableToNodeMap::iterator, bool> p = 
-                mMovableToNodeMap.insert(
-                MovableToNodeMap::value_type(mov, list<BspNode*>::type()));
+            std::pair<MovableToNodeMap::iterator, bool> p = mMovableToNodeMap.emplace(mov, std::list<BspNode*>());
 
             p.first->second.push_back(node);
 
@@ -990,7 +983,7 @@ namespace Ogre {
         MovableToNodeMap::iterator i = mMovableToNodeMap.find(mov);
         if (i != mMovableToNodeMap.end())
         {
-            list<BspNode*>::type::iterator nodeit, nodeitend;
+            std::list<BspNode*>::iterator nodeit, nodeitend;
             nodeitend = i->second.end();
             for (nodeit = i->second.begin(); nodeit != nodeitend; ++nodeit)
             {

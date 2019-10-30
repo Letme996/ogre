@@ -177,7 +177,7 @@ namespace Ogre {
             size_t mLockSize;
             bool mSystemMemory;
             bool mUseShadowBuffer;
-            HardwareBuffer* mShadowBuffer;
+            std::unique_ptr<HardwareBuffer> mShadowBuffer;
             bool mShadowUpdated;
             bool mSuppressHardwareUpdate;
             
@@ -190,7 +190,7 @@ namespace Ogre {
             /// Constructor, to be called by HardwareBufferManager only
             HardwareBuffer(Usage usage, bool systemMemory, bool useShadowBuffer) 
                 : mSizeInBytes(0), mUsage(usage), mIsLocked(false), mLockStart(0), mLockSize(0), mSystemMemory(systemMemory),
-                mUseShadowBuffer(useShadowBuffer), mShadowBuffer(NULL), mShadowUpdated(false), 
+                mUseShadowBuffer(useShadowBuffer), mShadowUpdated(false),
                 mSuppressHardwareUpdate(false) 
             {
                 // If use shadow buffer, upgrade to WRITE_ONLY on hardware side
@@ -208,7 +208,6 @@ namespace Ogre {
             @param offset The byte offset from the start of the buffer to lock
             @param length The size of the area to lock, in bytes
             @param options Locking options
-            @param uploadOpt
             @return Pointer to the locked memory
             */
             virtual void* lock(size_t offset, size_t length, LockOptions options)
@@ -378,30 +377,68 @@ namespace Ogre {
 
             
     };
-    /** @} */
-    /** @} */
 
     /** Locking helper. Guaranteed unlocking even in case of exception. */
-    template <typename T> struct HardwareBufferLockGuard
+    struct HardwareBufferLockGuard
     {
-        HardwareBufferLockGuard(const T& p, HardwareBuffer::LockOptions options)
-            : pBuf(p)
+        HardwareBufferLockGuard() : pBuf(0), pData(0) {}
+        
+        HardwareBufferLockGuard(HardwareBuffer* p, HardwareBuffer::LockOptions options)
+            : pBuf(0), pData(0) { lock(p, options); }
+        
+        HardwareBufferLockGuard(HardwareBuffer* p, size_t offset, size_t length, HardwareBuffer::LockOptions options)
+            : pBuf(0), pData(0) { lock(p, offset, length, options); }
+        
+        template <typename T>
+        HardwareBufferLockGuard(const SharedPtr<T>& p, HardwareBuffer::LockOptions options)
+            : pBuf(0), pData(0) { lock(p.get(), options); }
+        
+        template <typename T>
+        HardwareBufferLockGuard(const SharedPtr<T>& p, size_t offset, size_t length, HardwareBuffer::LockOptions options)
+            : pBuf(0), pData(0) { lock(p.get(), offset, length, options); }
+        
+        ~HardwareBufferLockGuard() { unlock(); }
+        
+        void unlock()
         {
+            if(pBuf)
+            {
+                pBuf->unlock();
+                pBuf = 0;
+                pData = 0;
+            }   
+        }
+
+        void lock(HardwareBuffer* p, HardwareBuffer::LockOptions options)
+        {
+            assert(p);
+            unlock();
+            pBuf = p;
             pData = pBuf->lock(options);
         }
-        HardwareBufferLockGuard(const T& p, size_t offset, size_t length, HardwareBuffer::LockOptions options)
-            : pBuf(p)
+        
+        void lock(HardwareBuffer* p, size_t offset, size_t length, HardwareBuffer::LockOptions options)
         {
+            assert(p);
+            unlock();
+            pBuf = p;
             pData = pBuf->lock(offset, length, options);
-        }       
-        ~HardwareBufferLockGuard()
-        {
-            pBuf->unlock();
         }
         
-        const T& pBuf;
+        template <typename T>
+        void lock(const SharedPtr<T>& p, HardwareBuffer::LockOptions options)
+            { lock(p.get(), options); }
+        
+        template <typename T>
+        void lock(const SharedPtr<T>& p, size_t offset, size_t length, HardwareBuffer::LockOptions options)
+            { lock(p.get(), offset, length, options); }
+        
+        HardwareBuffer* pBuf;
         void* pData;
     };
+
+    /** @} */
+    /** @} */
 }
 #endif
 

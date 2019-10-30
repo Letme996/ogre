@@ -207,6 +207,14 @@ namespace Ogre
         return true;
     }
     //-----------------------------------------------------------------------
+    Polygon& Polygon::operator=(const Ogre::Polygon& rhs)
+    {
+        mIsNormalSet = rhs.mIsNormalSet;
+        mNormal = rhs.mNormal;
+        mVertexList = rhs.mVertexList;
+        return *this;
+    }
+    //-----------------------------------------------------------------------
     std::ostream& operator<< ( std::ostream& strm, const Polygon& poly )
     {
         strm << "NUM VERTICES: " << poly.getVertexCount() << std::endl;
@@ -243,7 +251,7 @@ namespace Ogre
             else
             {
                 Real costheta = v1.dotProduct(v2) / (len1 * len2);
-                anglesum += acos(costheta);
+                anglesum += std::acos(costheta);
             }
         }
 

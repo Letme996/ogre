@@ -81,7 +81,7 @@ namespace Ogre {
             SceneBlendFactor blendDest;
             bool customBlend;
             CompareFunction depthFunc;
-            TextureUnitState::TextureAddressingMode addressMode;
+            TextureAddressingMode addressMode;
             // TODO - alphaFunc
             GenFunc rgbGenFunc;
             WaveType rgbGenWave;
@@ -104,7 +104,7 @@ namespace Ogre {
 
         unsigned int flags;
         int numPasses;
-        typedef vector<Pass>::type PassList;
+        typedef std::vector<Pass> PassList;
         PassList pass;
         bool farbox;            // Skybox
         String farboxName;

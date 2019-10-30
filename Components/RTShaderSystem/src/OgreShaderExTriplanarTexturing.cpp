@@ -36,37 +36,28 @@ namespace RTShader {
 
 	bool TriplanarTexturing::resolveParameters(ProgramSet* programSet)
 	{
-		Program* vsProgram = programSet->getCpuVertexProgram();
-		Program* psProgram = programSet->getCpuFragmentProgram();
+		Program* vsProgram = programSet->getCpuProgram(GPT_VERTEX_PROGRAM);
+		Program* psProgram = programSet->getCpuProgram(GPT_FRAGMENT_PROGRAM);
 		Function* vsMain = vsProgram->getEntryPointFunction();
 		Function* psMain = psProgram->getEntryPointFunction();
 
-		// Resolve pixel shader output diffuse color.
-		mPSInDiffuse = vsMain->resolveInputParameter(Parameter::SPS_COLOR, 0, Parameter::SPC_COLOR_DIFFUSE, GCT_FLOAT4);
-
 		// Resolve input vertex shader normal.
-		mVSInNormal = vsMain->resolveInputParameter(Parameter::SPS_NORMAL, 0, Parameter::SPC_NORMAL_OBJECT_SPACE, GCT_FLOAT3);
+		mVSInNormal = vsMain->resolveInputParameter(Parameter::SPC_NORMAL_OBJECT_SPACE);
 
 		// Resolve output vertex shader normal.
-		mVSOutNormal = vsMain->resolveOutputParameter(Parameter::SPS_TEXTURE_COORDINATES, -1, Parameter::SPC_NORMAL_VIEW_SPACE, GCT_FLOAT3);
+		mVSOutNormal = vsMain->resolveOutputParameter(Parameter::SPC_NORMAL_OBJECT_SPACE);
 
 		// Resolve pixel shader output diffuse color.
-		mPSInDiffuse = psMain->resolveInputParameter(Parameter::SPS_COLOR, 0, Parameter::SPC_COLOR_DIFFUSE, GCT_FLOAT4);
+		mPSInDiffuse = psMain->resolveOutputParameter(Parameter::SPC_COLOR_DIFFUSE);
 
 		// Resolve input pixel shader normal.
-		mPSInNormal = psMain->resolveInputParameter(Parameter::SPS_TEXTURE_COORDINATES,
-			mVSOutNormal->getIndex(),
-			mVSOutNormal->getContent(),
-			GCT_FLOAT3);
+		mPSInNormal = psMain->resolveInputParameter(mVSOutNormal);
 
 		// Resolve input vertex shader normal.
-		mVSInPosition = vsMain->resolveInputParameter(Parameter::SPS_POSITION, 0, Parameter::SPC_POSITION_OBJECT_SPACE, GCT_FLOAT4);
+		mVSInPosition = vsMain->resolveInputParameter(Parameter::SPC_POSITION_OBJECT_SPACE);
 
 		mVSOutPosition = vsMain->resolveOutputParameter(Parameter::SPS_TEXTURE_COORDINATES, -1, Parameter::SPC_POSITION_OBJECT_SPACE, GCT_FLOAT4);
-		mPSInPosition = psMain->resolveInputParameter(Parameter::SPS_TEXTURE_COORDINATES,
-			mVSOutPosition->getIndex(),
-			mVSOutPosition->getContent(),
-			GCT_FLOAT4);
+		mPSInPosition = psMain->resolveInputParameter(mVSOutPosition);
 
 		mSamplerFromX = psProgram->resolveParameter(GCT_SAMPLER2D, mTextureSamplerIndexFromX, (uint16)GPV_GLOBAL, "tp_sampler_from_x");
 		if (mSamplerFromX.get() == NULL)
@@ -80,25 +71,7 @@ namespace RTShader {
 		if (mSamplerFromZ.get() == NULL)
 			return false;
 
-		if (Ogre::RTShader::ShaderGenerator::getSingletonPtr()->IsHlsl4())
-		{
-			mSamplerFromXState = psProgram->resolveParameter(GCT_SAMPLER_STATE, mTextureSamplerIndexFromX, (uint16)GPV_PER_OBJECT, "tp_sampler_from_xState");
-			mSamplerFromYState = psProgram->resolveParameter(GCT_SAMPLER_STATE, mTextureSamplerIndexFromY, (uint16)GPV_PER_OBJECT, "tp_sampler_from_yState");
-			mSamplerFromZState = psProgram->resolveParameter(GCT_SAMPLER_STATE, mTextureSamplerIndexFromZ, (uint16)GPV_PER_OBJECT, "tp_sampler_from_zState");
-			
-			if (mSamplerFromXState.get() == NULL)
-				return false;
-
-			mSamplerFromY = psProgram->resolveParameter(GCT_SAMPLER2D, mTextureSamplerIndexFromY, (uint16)GPV_GLOBAL, "tp_sampler_from_y");
-			if (mSamplerFromYState.get() == NULL)
-				return false;
-
-			mSamplerFromZ = psProgram->resolveParameter(GCT_SAMPLER2D, mTextureSamplerIndexFromZ, (uint16)GPV_GLOBAL, "tp_sampler_from_z");
-			if (mSamplerFromZState.get() == NULL)
-				return false;
-		}
-
-        mPSOutDiffuse = psMain->resolveOutputParameter(Parameter::SPS_COLOR, 0, Parameter::SPC_COLOR_DIFFUSE, GCT_FLOAT4);
+        mPSOutDiffuse = psMain->resolveOutputParameter(Parameter::SPC_COLOR_DIFFUSE);
         if (mPSOutDiffuse.get() == NULL)    
             return false;
     
@@ -111,8 +84,8 @@ namespace RTShader {
     //-----------------------------------------------------------------------
     bool TriplanarTexturing::resolveDependencies(ProgramSet* programSet)
     {
-        Program* psProgram = programSet->getCpuFragmentProgram();
-        Program* vsProgram = programSet->getCpuVertexProgram();
+        Program* psProgram = programSet->getCpuProgram(GPT_FRAGMENT_PROGRAM);
+        Program* vsProgram = programSet->getCpuProgram(GPT_VERTEX_PROGRAM);
 		psProgram->addDependency(FFP_LIB_TEXTURING);
         psProgram->addDependency("SGXLib_TriplanarTexturing");
         vsProgram->addDependency(FFP_LIB_COMMON);
@@ -122,45 +95,19 @@ namespace RTShader {
     //-----------------------------------------------------------------------
 	bool TriplanarTexturing::addFunctionInvocations(ProgramSet* programSet)
 	{
-		Program* psProgram = programSet->getCpuFragmentProgram();
-		Function* psMain = psProgram->getEntryPointFunction();
-		Program* vsProgram = programSet->getCpuVertexProgram();
-		Function* vsMain = vsProgram->getEntryPointFunction();
+        Program* psProgram = programSet->getCpuProgram(GPT_FRAGMENT_PROGRAM);
+        Function* psMain = psProgram->getEntryPointFunction();
+        Program* vsProgram = programSet->getCpuProgram(GPT_VERTEX_PROGRAM);
+        Function* vsMain = vsProgram->getEntryPointFunction();
 
-		vsMain->addAtomAssign(mVSOutNormal, mVSInNormal, FFP_VS_TEXTURING);
-		vsMain->addAtomAssign(mVSOutPosition, mVSInPosition, FFP_VS_TEXTURING);
+        auto vsStage = vsMain->getStage(FFP_PS_TEXTURING);
+        vsStage.assign(mVSInNormal, mVSOutNormal);
+        vsStage.assign(mVSInPosition, mVSOutPosition);
 
-		if (Ogre::RTShader::ShaderGenerator::getSingletonPtr()->IsHlsl4())
-		{
-			FFPTexturing::AddTextureSampleWrapperInvocation(mSamplerFromX, mSamplerFromXState, GCT_SAMPLER2D, psMain, FFP_PS_TEXTURING);
-			FFPTexturing::AddTextureSampleWrapperInvocation(mSamplerFromY, mSamplerFromYState, GCT_SAMPLER2D, psMain, FFP_PS_TEXTURING);
-			FFPTexturing::AddTextureSampleWrapperInvocation(mSamplerFromZ, mSamplerFromZState, GCT_SAMPLER2D, psMain, FFP_PS_TEXTURING);
-		}
-
-        FunctionInvocation *curFuncInvocation;
-		curFuncInvocation = OGRE_NEW FunctionInvocation(SGX_FUNC_TRIPLANAR_TEXTURING, FFP_PS_TEXTURING);
-		curFuncInvocation->pushOperand(mPSInDiffuse, Operand::OPS_IN);
-		curFuncInvocation->pushOperand(mPSInNormal, Operand::OPS_IN);
-		curFuncInvocation->pushOperand(mPSInPosition, Operand::OPS_IN);
-
-		
-		bool isHLSL = Ogre::RTShader::ShaderGenerator::getSingleton().getTargetLanguage() == "hlsl";
-		
-		if (isHLSL)
-		{
-			curFuncInvocation->pushOperand(FFPTexturing::GetSamplerWrapperParam(mSamplerFromX, psMain), Operand::OPS_IN);
-			curFuncInvocation->pushOperand(FFPTexturing::GetSamplerWrapperParam(mSamplerFromX, psMain), Operand::OPS_IN);
-			curFuncInvocation->pushOperand(FFPTexturing::GetSamplerWrapperParam(mSamplerFromX, psMain), Operand::OPS_IN);
-		}
-		else
-		{
-			curFuncInvocation->pushOperand(mSamplerFromX, Operand::OPS_IN);
-			curFuncInvocation->pushOperand(mSamplerFromY, Operand::OPS_IN);
-			curFuncInvocation->pushOperand(mSamplerFromZ, Operand::OPS_IN);
-		}
-        curFuncInvocation->pushOperand(mPSTPParams, Operand::OPS_IN);
-        curFuncInvocation->pushOperand(mPSOutDiffuse, Operand::OPS_OUT);
-        psMain->addAtomInstance(curFuncInvocation); 
+        psMain->getStage(FFP_PS_TEXTURING)
+            .callFunction(SGX_FUNC_TRIPLANAR_TEXTURING,
+                          {In(mPSInDiffuse), In(mPSInNormal), In(mPSInPosition), In(mSamplerFromX),
+                           In(mSamplerFromY), In(mSamplerFromZ), In(mPSTPParams), Out(mPSOutDiffuse)});
 
         return true;
     }
@@ -228,7 +175,7 @@ namespace RTShader {
     }
 
     //-----------------------------------------------------------------------
-    void TriplanarTexturing::updateGpuProgramsParams(Renderable* rend, Pass* pass, const AutoParamDataSource* source, 
+    void TriplanarTexturing::updateGpuProgramsParams(Renderable* rend, const Pass* pass, const AutoParamDataSource* source,
                                          const LightList* pLightList)
     {
         mPSTPParams->setGpuParameter(mParameters);

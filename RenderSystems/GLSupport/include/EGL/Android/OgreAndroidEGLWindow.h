@@ -52,6 +52,7 @@ namespace Ogre {
         int mMSAA;
         int mCSAA;
         bool mPreserveContext;
+        float mScale;
         
     protected:
         virtual void getLeftAndTopFromNativeWindow(int & left, int & top, uint width, uint height);
@@ -67,6 +68,8 @@ namespace Ogre {
         void create(const String& name, unsigned int width, unsigned int height,
                     bool fullScreen, const NameValuePairList *miscParams);
         
+        float getViewPointToPixelScale() { return mScale; }
+
         void _notifySurfaceDestroyed();
         void _notifySurfaceCreated(void* window, void* config);
     };

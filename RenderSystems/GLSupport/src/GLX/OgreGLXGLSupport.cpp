@@ -90,9 +90,9 @@ namespace Ogre
 
                 screenSizes = XRRConfigSizes(screenConfig, &nSizes);
 
-                mCurrentMode.first.first = screenSizes[currentSizeID].width;
-                mCurrentMode.first.second = screenSizes[currentSizeID].height;
-                mCurrentMode.second = XRRConfigCurrentRate(screenConfig);
+                mCurrentMode.width = screenSizes[currentSizeID].width;
+                mCurrentMode.height = screenSizes[currentSizeID].height;
+                mCurrentMode.refreshRate = XRRConfigCurrentRate(screenConfig);
 
                 mOriginalMode = mCurrentMode;
 
@@ -107,9 +107,9 @@ namespace Ogre
                     {
                         VideoMode mode;
 
-                        mode.first.first = screenSizes[sizeID].width;
-                        mode.first.second = screenSizes[sizeID].height;
-                        mode.second = rates[rate];
+                        mode.width = screenSizes[sizeID].width;
+                        mode.height = screenSizes[sizeID].height;
+                        mode.refreshRate = rates[rate];
 
                         mVideoModes.push_back(mode);
                     }
@@ -119,9 +119,9 @@ namespace Ogre
         }
         else
         {
-            mCurrentMode.first.first = DisplayWidth(mXDisplay, DefaultScreen(mXDisplay));
-            mCurrentMode.first.second = DisplayHeight(mXDisplay, DefaultScreen(mXDisplay));
-            mCurrentMode.second = 0;
+            mCurrentMode.width = DisplayWidth(mXDisplay, DefaultScreen(mXDisplay));
+            mCurrentMode.height = DisplayHeight(mXDisplay, DefaultScreen(mXDisplay));
+            mCurrentMode.refreshRate = 0;
 
             mOriginalMode = mCurrentMode;
 
@@ -142,13 +142,11 @@ namespace Ogre
             if (caveat != GLX_SLOW_CONFIG)
             {
                 getFBConfigAttrib (fbConfigs[config], GLX_SAMPLES, &samples);
-                mSampleLevels.push_back(StringConverter::toString(samples));
+                mFSAALevels.push_back(samples);
             }
         }
 
         XFree (fbConfigs);
-
-        removeDuplicates(mSampleLevels);
     }
 
     //-------------------------------------------------------------------------------------------------//
@@ -159,213 +157,6 @@ namespace Ogre
 
         if (! mIsExternalDisplay && mGLDisplay)
             XCloseDisplay(mGLDisplay);
-    }
-
-    //-------------------------------------------------------------------------------------------------//
-    void GLXGLSupport::addConfig(void)
-    {
-        ConfigOption optFullScreen;
-        ConfigOption optVideoMode;
-        ConfigOption optDisplayFrequency;
-        ConfigOption optVSync;
-        ConfigOption optFSAA;
-        ConfigOption optRTTMode;
-        ConfigOption optSRGB;
-#if OGRE_NO_QUAD_BUFFER_STEREO == 0
-		ConfigOption optStereoMode;
-#endif
-
-        optFullScreen.name = "Full Screen";
-        optFullScreen.immutable = false;
-
-        optVideoMode.name = "Video Mode";
-        optVideoMode.immutable = false;
-
-        optDisplayFrequency.name = "Display Frequency";
-        optDisplayFrequency.immutable = false;
-
-        optVSync.name = "VSync";
-        optVSync.immutable = false;
-
-        optFSAA.name = "FSAA";
-        optFSAA.immutable = false;
-
-        optRTTMode.name = "RTT Preferred Mode";
-        optRTTMode.immutable = false;
-
-        optSRGB.name = "sRGB Gamma Conversion";
-        optSRGB.immutable = false;
-
-        optFullScreen.possibleValues.push_back("No");
-        optFullScreen.possibleValues.push_back("Yes");
-        optFullScreen.currentValue = optFullScreen.possibleValues[0];
-
-        VideoModes::const_iterator value = mVideoModes.begin();
-        VideoModes::const_iterator end = mVideoModes.end();
-
-        for (; value != end; value++)
-        {
-            String mode = StringConverter::toString(value->first.first,4) + " x " + StringConverter::toString(value->first.second,4);
-
-            optVideoMode.possibleValues.push_back(mode);
-        }
-
-        removeDuplicates(optVideoMode.possibleValues);
-
-        optVideoMode.currentValue = StringConverter::toString(mCurrentMode.first.first,4) + " x " + StringConverter::toString(mCurrentMode.first.second,4);
-
-        refreshConfig();
-
-        optVSync.possibleValues.push_back("No");
-        optVSync.possibleValues.push_back("Yes");
-        optVSync.currentValue = optVSync.possibleValues[1];
-
-        optRTTMode.possibleValues.push_back("FBO");
-        optRTTMode.possibleValues.push_back("PBuffer");
-        optRTTMode.possibleValues.push_back("Copy");
-        optRTTMode.currentValue = optRTTMode.possibleValues[0];
-
-        if (! mSampleLevels.empty())
-        {
-            StringVector::const_iterator sampleLevel = mSampleLevels.begin();
-
-            for (; sampleLevel != mSampleLevels.end(); sampleLevel++)
-            {
-                optFSAA.possibleValues.push_back(*sampleLevel);
-            }
-
-            optFSAA.currentValue = optFSAA.possibleValues[0];
-        }
-
-        optSRGB.possibleValues.push_back("No");
-        optSRGB.possibleValues.push_back("Yes");
-
-        optSRGB.currentValue = optSRGB.possibleValues[0];
-
-#if OGRE_NO_QUAD_BUFFER_STEREO == 0
-		optStereoMode.name = "Stereo Mode";
-		optStereoMode.possibleValues.push_back(StringConverter::toString(SMT_NONE));
-		optStereoMode.possibleValues.push_back(StringConverter::toString(SMT_FRAME_SEQUENTIAL));
-		optStereoMode.currentValue = optStereoMode.possibleValues[0];
-		optStereoMode.immutable = false;
-
-		mOptions[optStereoMode.name] = optStereoMode;
-#endif
-
-        mOptions[optFullScreen.name] = optFullScreen;
-        mOptions[optVideoMode.name] = optVideoMode;
-        mOptions[optDisplayFrequency.name] = optDisplayFrequency;
-        mOptions[optVSync.name] = optVSync;
-        mOptions[optRTTMode.name] = optRTTMode;
-        mOptions[optFSAA.name] = optFSAA;
-        mOptions[optSRGB.name] = optSRGB;
-
-        refreshConfig();
-    }
-
-    //-------------------------------------------------------------------------------------------------//
-    void GLXGLSupport::refreshConfig(void)
-    {
-        ConfigOptionMap::iterator optVideoMode = mOptions.find("Video Mode");
-        ConfigOptionMap::iterator optDisplayFrequency = mOptions.find("Display Frequency");
-        ConfigOptionMap::iterator optFullScreen = mOptions.find("Full Screen");
-
-        bool isFullscreen = false;
-        if( optFullScreen != mOptions.end() && optFullScreen->second.currentValue == "Yes" )
-            isFullscreen = true;
-
-        if (optVideoMode != mOptions.end() && optDisplayFrequency != mOptions.end())
-        {
-            optDisplayFrequency->second.possibleValues.clear();
-            if( !isFullscreen )
-                optDisplayFrequency->second.possibleValues.push_back( "N/A" );
-            else
-            {
-                VideoModes::const_iterator value = mVideoModes.begin();
-                VideoModes::const_iterator end = mVideoModes.end();
-
-                for (; value != end; value++)
-                {
-                    String mode = StringConverter::toString(value->first.first,4) + " x " +
-                                  StringConverter::toString(value->first.second,4);
-
-                    if (mode == optVideoMode->second.currentValue)
-                    {
-                        String frequency = StringConverter::toString(value->second) + " Hz";
-
-                        optDisplayFrequency->second.possibleValues.push_back(frequency);
-                    }
-                }
-            }
-
-            if (! optDisplayFrequency->second.possibleValues.empty())
-            {
-                optDisplayFrequency->second.currentValue = optDisplayFrequency->second.possibleValues[0];
-            }
-            else
-            {
-                optVideoMode->second.currentValue = StringConverter::toString(mVideoModes[0].first.first,4) + " x " + StringConverter::toString(mVideoModes[0].first.second,4);
-                optDisplayFrequency->second.currentValue = StringConverter::toString(mVideoModes[0].second) + " Hz";
-            }
-        }
-    }
-
-    //-------------------------------------------------------------------------------------------------//
-    void GLXGLSupport::setConfigOption(const String &name, const String &value)
-    {
-        GLNativeSupport::setConfigOption(name, value);
-
-        if( name == "Video Mode" || name == "Full Screen" )
-        {
-            refreshConfig();
-        }
-    }
-
-    //-------------------------------------------------------------------------------------------------//
-    NameValuePairList GLXGLSupport::parseOptions(uint& w, uint& h, bool& fullscreen)
-    {
-        ConfigOptionMap::iterator opt;
-        ConfigOptionMap::iterator end = mOptions.end();
-        NameValuePairList miscParams;
-
-        fullscreen = false;
-        w = 800, h = 600;
-
-        if((opt = mOptions.find("Full Screen")) != end)
-            fullscreen = (opt->second.currentValue == "Yes");
-
-        if((opt = mOptions.find("Display Frequency")) != end)
-            miscParams["displayFrequency"] = opt->second.currentValue;
-
-        if((opt = mOptions.find("Video Mode")) != end)
-        {
-            String val = opt->second.currentValue;
-            String::size_type pos = val.find('x');
-
-            if (pos != String::npos)
-            {
-                w = StringConverter::parseUnsignedInt(val.substr(0, pos));
-                h = StringConverter::parseUnsignedInt(val.substr(pos + 1));
-            }
-        }
-
-        if((opt = mOptions.find("FSAA")) != end)
-            miscParams["FSAA"] = opt->second.currentValue;
-
-        if((opt = mOptions.find("VSync")) != end)
-            miscParams["vsync"] = opt->second.currentValue;
-
-        if((opt = mOptions.find("sRGB Gamma Conversion")) != end)
-            miscParams["gamma"] = opt->second.currentValue;
-
-#if OGRE_NO_QUAD_BUFFER_STEREO == 0
-        opt = mOptions.find("Stereo Mode");
-        if (opt == mOptions.end())
-            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "Can't find stereo enabled options!", "GLXGLSupport::createWindow");
-        miscParams["stereoMode"] = opt->second.currentValue;
-#endif
-
-        return miscParams;
     }
 
     //-------------------------------------------------------------------------------------------------//
@@ -404,7 +195,7 @@ namespace Ogre
     }
 
     //-------------------------------------------------------------------------------------------------//
-    void* GLXGLSupport::getProcAddress(const char* procname) {
+    void* GLXGLSupport::getProcAddress(const char* procname) const {
         return (void*)glXGetProcAddressARB((const GLubyte*)procname);
     }
 
@@ -515,6 +306,9 @@ namespace Ogre
 
     GLXFBConfig GLXGLSupport::getFBConfigFromVisualID(VisualID visualid)
     {
+        PFNGLXGETFBCONFIGFROMVISUALSGIXPROC glXGetFBConfigFromVisualSGIX = 
+            (PFNGLXGETFBCONFIGFROMVISUALSGIXPROC)getProcAddress("glXGetFBConfigFromVisualSGIX");
+
         GLXFBConfig fbConfig = 0;
 
         XVisualInfo visualInfo;
@@ -667,94 +461,6 @@ namespace Ogre
     }
 
     //-------------------------------------------------------------------------------------------------//
-    bool GLXGLSupport::loadIcon(const String &name, Pixmap *pixmap, Pixmap *bitmap)
-    {
-        Image image;
-        int width, height;
-        char* imageData;
-
-        if (! Ogre::ResourceGroupManager::getSingleton().resourceExists(ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME, name))
-            return false;
-
-        try
-        {
-            // Try to load image
-            image.load(name, ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
-
-            if(image.getFormat() != PF_A8R8G8B8)
-            {
-                // Image format must be RGBA
-                return false;
-            }
-
-            width  = image.getWidth();
-            height = image.getHeight();
-            imageData = (char*)image.getData();
-        }
-        catch(Exception &e)
-        {
-            // Could not find image; never mind
-            return false;
-        }
-
-        int bitmapLineLength = (width + 7) / 8;
-        int pixmapLineLength = 4 * width;
-
-        char* bitmapData = (char*)malloc(bitmapLineLength * height);
-        char* pixmapData = (char*)malloc(pixmapLineLength * height);
-
-        int sptr = 0, dptr = 0;
-
-        for(int y = 0; y < height; y++)
-        {
-            for(int x = 0; x < width; x++)
-            {
-                if (ImageByteOrder(mXDisplay) == MSBFirst)
-                {
-                    pixmapData[dptr + 0] = 0;
-                    pixmapData[dptr + 1] = imageData[sptr + 0];
-                    pixmapData[dptr + 2] = imageData[sptr + 1];
-                    pixmapData[dptr + 3] = imageData[sptr + 2];
-                }
-                else
-                {
-                    pixmapData[dptr + 3] = 0;
-                    pixmapData[dptr + 2] = imageData[sptr + 0];
-                    pixmapData[dptr + 1] = imageData[sptr + 1];
-                    pixmapData[dptr + 0] = imageData[sptr + 2];
-                }
-
-                if(((unsigned char)imageData[sptr + 3])<128)
-                {
-                    bitmapData[y*bitmapLineLength+(x>>3)] &= ~(1<<(x&7));
-                }
-                else
-                {
-                    bitmapData[y*bitmapLineLength+(x>>3)] |= 1<<(x&7);
-                }
-                sptr += 4;
-                dptr += 4;
-            }
-        }
-
-        // Create bitmap on server and copy over bitmapData
-        *bitmap = XCreateBitmapFromData(mXDisplay, DefaultRootWindow(mXDisplay), bitmapData, width, height);
-
-        free(bitmapData);
-
-        // Create pixmap on server and copy over pixmapData (via pixmapXImage)
-        *pixmap = XCreatePixmap(mXDisplay, DefaultRootWindow(mXDisplay), width, height, 24);
-
-        GC gc = XCreateGC (mXDisplay, DefaultRootWindow(mXDisplay), 0, NULL);
-        XImage *pixmapXImage = XCreateImage(mXDisplay, NULL, 24, ZPixmap, 0, pixmapData, width, height, 8, width*4);
-        XPutImage(mXDisplay, *pixmap, gc, pixmapXImage, 0, 0, 0, 0, width, height);
-        XDestroyImage(pixmapXImage);
-        XFreeGC(mXDisplay, gc);
-
-        return true;
-    }
-
-    //-------------------------------------------------------------------------------------------------//
     Display* GLXGLSupport::getGLDisplay(void)
     {
         if (! mGLDisplay)
@@ -854,7 +560,7 @@ namespace Ogre
             XSetErrorHandler(&ctxErrorHandler);
 
         PFNGLXCREATECONTEXTATTRIBSARBPROC _glXCreateContextAttribsARB;
-        _glXCreateContextAttribsARB = (PFNGLXCREATECONTEXTATTRIBSARBPROC)const_cast<GLXGLSupport*>(this)->getProcAddress("glXCreateContextAttribsARB");
+        _glXCreateContextAttribsARB = (PFNGLXCREATECONTEXTATTRIBSARBPROC)getProcAddress("glXCreateContextAttribsARB");
 
 	OgreAssert(_glXCreateContextAttribsARB, "glXCreateContextAttribsARB() function not found");
 
@@ -873,7 +579,7 @@ namespace Ogre
                 if(context_attribs[3] == 0)
                 {
                     context_attribs[1] -= 1;
-                    context_attribs[3] = 5;
+                    context_attribs[3] = 6;
                 }
                 else
                 {
@@ -936,11 +642,13 @@ namespace Ogre
         int size = 0;
         int newSize = -1;
 
-        VideoModes::iterator mode;
-        VideoModes::iterator end = mVideoModes.end();
-        VideoMode *newMode = 0;
+        GLXVideoModes glxVideoModes(mVideoModes.begin(), mVideoModes.end());
 
-        for(mode = mVideoModes.begin(); mode != end; size++)
+        GLXVideoModes::iterator mode;
+        GLXVideoModes::iterator end = glxVideoModes.end();
+        GLXVideoMode *newMode = 0;
+
+        for(mode = glxVideoModes.begin(); mode != end; size++)
         {
             if (mode->first.first >= width &&
                 mode->first.second >= height)
@@ -954,7 +662,7 @@ namespace Ogre
                 }
             }
 
-            VideoMode *lastMode = &(*mode);
+            GLXVideoMode *lastMode = &(*mode);
 
             while (++mode != end && mode->first == lastMode->first)
             {
@@ -979,9 +687,9 @@ namespace Ogre
 
                 XRRFreeScreenConfigInfo(screenConfig);
 
-                mCurrentMode = *newMode;
+                mCurrentMode = {newMode->first.first, newMode->first.second, newMode->second};
 
-                LogManager::getSingleton().logMessage("Entered video mode " + StringConverter::toString(mCurrentMode.first.first) + "x" + StringConverter::toString(mCurrentMode.first.second) + " @ " + StringConverter::toString(mCurrentMode.second) + "Hz");
+                LogManager::getSingleton().logMessage("Entered video mode " + mCurrentMode.getDescription() + " @ " + StringConverter::toString(mCurrentMode.refreshRate) + "Hz");
             }
         }
     }
@@ -989,6 +697,6 @@ namespace Ogre
     //-------------------------------------------------------------------------------------------------//
     void GLXGLSupport::switchMode(void)
     {
-        return switchMode(mOriginalMode.first.first, mOriginalMode.first.second, mOriginalMode.second);
+        return switchMode(mOriginalMode.width, mOriginalMode.height, mOriginalMode.refreshRate);
     }
 }

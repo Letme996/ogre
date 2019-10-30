@@ -32,6 +32,7 @@ THE SOFTWARE.
 #include "OgreGpuProgram.h"
 #include "OgrePass.h"
 #include "OgreShaderGenerator.h"
+#include "OgreTextureManager.h"
 
 #define FFP_FUNC_PIXELFOG_POSITION_DEPTH                        "FFP_PixelFog_PositionDepth"
 
@@ -63,7 +64,7 @@ int RTShaderSRSTexturedFog::getExecutionOrder() const
     return FFP_FOG;
 }
 //-----------------------------------------------------------------------
-void RTShaderSRSTexturedFog::updateGpuProgramsParams(Renderable* rend, Pass* pass, const AutoParamDataSource* source, 
+void RTShaderSRSTexturedFog::updateGpuProgramsParams(Renderable* rend, const Pass* pass, const AutoParamDataSource* source,
                                      const LightList* pLightList)
 {   
     if (mFogMode == FOG_NONE)
@@ -112,34 +113,34 @@ bool RTShaderSRSTexturedFog::resolveParameters(ProgramSet* programSet)
     if (mFogMode == FOG_NONE)
         return true;
 
-    Program* vsProgram = programSet->getCpuVertexProgram();
-    Program* psProgram = programSet->getCpuFragmentProgram();
+    Program* vsProgram = programSet->getCpuProgram(GPT_VERTEX_PROGRAM);
+    Program* psProgram = programSet->getCpuProgram(GPT_FRAGMENT_PROGRAM);
     Function* vsMain = vsProgram->getEntryPointFunction();
     Function* psMain = psProgram->getEntryPointFunction();
 
 
     // Resolve world view matrix.
-    mWorldMatrix = vsProgram->resolveAutoParameterInt(GpuProgramParameters::ACT_WORLD_MATRIX, 0);
+    mWorldMatrix = vsProgram->resolveParameter(GpuProgramParameters::ACT_WORLD_MATRIX);
     if (mWorldMatrix.get() == NULL)
         return false;
     
     // Resolve world view matrix.
-    mCameraPos = vsProgram->resolveAutoParameterInt(GpuProgramParameters::ACT_CAMERA_POSITION, 0);
+    mCameraPos = vsProgram->resolveParameter(GpuProgramParameters::ACT_CAMERA_POSITION);
     if (mCameraPos.get() == NULL)
         return false;
     
     // Resolve vertex shader input position.
-    mVSInPos = vsMain->resolveInputParameter(Parameter::SPS_POSITION, 0, Parameter::SPC_POSITION_OBJECT_SPACE, GCT_FLOAT4);
+    mVSInPos = vsMain->resolveInputParameter(Parameter::SPC_POSITION_OBJECT_SPACE);
     if (mVSInPos.get() == NULL)
         return false;
 
         // Resolve fog colour.
-    mFogColour = psMain->resolveLocalParameter(Parameter::SPS_UNKNOWN, -1, "FogColor", GCT_FLOAT4);
+    mFogColour = psMain->resolveLocalParameter("FogColor", GCT_FLOAT4);
     if (mFogColour.get() == NULL)
         return false;
         
     // Resolve pixel shader output diffuse color.
-    mPSOutDiffuse = psMain->resolveOutputParameter(Parameter::SPS_COLOR, 0, Parameter::SPC_COLOR_DIFFUSE, GCT_FLOAT4);
+    mPSOutDiffuse = psMain->resolveOutputParameter(Parameter::SPC_COLOR_DIFFUSE);
     if (mPSOutDiffuse.get() == NULL)    
         return false;
     
@@ -149,30 +150,22 @@ bool RTShaderSRSTexturedFog::resolveParameters(ProgramSet* programSet)
         return false;
 
     // Resolve vertex shader output depth.      
-    mVSOutPosView = vsMain->resolveOutputParameter(Parameter::SPS_TEXTURE_COORDINATES, -1, 
-        Parameter::SPC_POSITION_VIEW_SPACE,
-        GCT_FLOAT3);
+    mVSOutPosView = vsMain->resolveOutputParameter(Parameter::SPC_POSITION_VIEW_SPACE);
     if (mVSOutPosView.get() == NULL)
         return false;
     
     // Resolve pixel shader input depth.
-    mPSInPosView = psMain->resolveInputParameter(Parameter::SPS_TEXTURE_COORDINATES, mVSOutPosView->getIndex(), 
-        mVSOutPosView->getContent(),
-        GCT_FLOAT3);
+    mPSInPosView = psMain->resolveInputParameter(mVSOutPosView);
     if (mPSInPosView.get() == NULL)
         return false;       
     
     // Resolve vertex shader output depth.      
-    mVSOutDepth = vsMain->resolveOutputParameter(Parameter::SPS_TEXTURE_COORDINATES, -1, 
-        Parameter::SPC_DEPTH_VIEW_SPACE,
-        GCT_FLOAT1);
+    mVSOutDepth = vsMain->resolveOutputParameter(Parameter::SPC_DEPTH_VIEW_SPACE);
     if (mVSOutDepth.get() == NULL)
         return false;
     
     // Resolve pixel shader input depth.
-    mPSInDepth = psMain->resolveInputParameter(Parameter::SPS_TEXTURE_COORDINATES, mVSOutDepth->getIndex(), 
-        mVSOutDepth->getContent(),
-        GCT_FLOAT1);
+    mPSInDepth = psMain->resolveInputParameter(mVSOutDepth);
     if (mPSInDepth.get() == NULL)
         return false;       
 
@@ -191,8 +184,8 @@ bool RTShaderSRSTexturedFog::resolveDependencies(ProgramSet* programSet)
     if (mFogMode == FOG_NONE)
         return true;
 
-    Program* vsProgram = programSet->getCpuVertexProgram();
-    Program* psProgram = programSet->getCpuFragmentProgram();
+    Program* vsProgram = programSet->getCpuProgram(GPT_VERTEX_PROGRAM);
+    Program* psProgram = programSet->getCpuProgram(GPT_FRAGMENT_PROGRAM);
 
     vsProgram->addDependency(FFP_LIB_FOG);
     psProgram->addDependency(FFP_LIB_COMMON);
@@ -209,49 +202,36 @@ bool RTShaderSRSTexturedFog::addFunctionInvocations(ProgramSet* programSet)
     if (mFogMode == FOG_NONE)
         return true;
 
-    Program* vsProgram = programSet->getCpuVertexProgram();
-    Program* psProgram = programSet->getCpuFragmentProgram();
+    Program* vsProgram = programSet->getCpuProgram(GPT_VERTEX_PROGRAM);
+    Program* psProgram = programSet->getCpuProgram(GPT_FRAGMENT_PROGRAM);
     Function* vsMain = vsProgram->getEntryPointFunction();
     Function* psMain = psProgram->getEntryPointFunction();
-    FunctionInvocation* curFuncInvocation = NULL;   
 
-    curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_PIXELFOG_POSITION_DEPTH, FFP_VS_FOG);
-    curFuncInvocation->pushOperand(mWorldMatrix, Operand::OPS_IN);
-    curFuncInvocation->pushOperand(mCameraPos, Operand::OPS_IN);
-    curFuncInvocation->pushOperand(mVSInPos, Operand::OPS_IN);  
-    curFuncInvocation->pushOperand(mVSOutPosView, Operand::OPS_OUT);    
-    curFuncInvocation->pushOperand(mVSOutDepth, Operand::OPS_OUT);  
-    vsMain->addAtomInstance(curFuncInvocation);     
-    
-    curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_SAMPLE_TEXTURE, FFP_PS_FOG);
-    curFuncInvocation->pushOperand(mBackgroundTextureSampler, Operand::OPS_IN);
-    curFuncInvocation->pushOperand(mPSInPosView, Operand::OPS_IN);
-    curFuncInvocation->pushOperand(mFogColour, Operand::OPS_OUT);
-    psMain->addAtomInstance(curFuncInvocation);
+    vsMain->getStage(FFP_VS_FOG)
+        .callFunction(FFP_FUNC_PIXELFOG_POSITION_DEPTH,
+                      {In(mWorldMatrix), In(mCameraPos), In(mVSInPos), Out(mVSOutPosView), Out(mVSOutDepth)});
 
+    auto psStage = psMain->getStage(FFP_PS_FOG);
+    psStage.sampleTexture(mBackgroundTextureSampler, mPSInPosView, mFogColour);
 
+    const char* fogFunc = NULL;
     switch (mFogMode)
     {
     case FOG_LINEAR:
-        curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_PIXELFOG_LINEAR, FFP_PS_FOG);
+        fogFunc = FFP_FUNC_PIXELFOG_LINEAR;
         break;
     case FOG_EXP:
-        curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_PIXELFOG_EXP, FFP_PS_FOG);
+        fogFunc = FFP_FUNC_PIXELFOG_EXP;
         break;
     case FOG_EXP2:
-        curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_PIXELFOG_EXP2, FFP_PS_FOG);
+        fogFunc = FFP_FUNC_PIXELFOG_EXP2;
         break;
-       case FOG_NONE:
-       default:
-           break;
+    case FOG_NONE:
+       break;
     }
 
-    curFuncInvocation->pushOperand(mPSInDepth, Operand::OPS_IN);
-    curFuncInvocation->pushOperand(mFogParams, Operand::OPS_IN);    
-    curFuncInvocation->pushOperand(mFogColour, Operand::OPS_IN);        
-    curFuncInvocation->pushOperand(mPSOutDiffuse, Operand::OPS_IN);
-    curFuncInvocation->pushOperand(mPSOutDiffuse, Operand::OPS_OUT);
-    psMain->addAtomInstance(curFuncInvocation); 
+    psStage.callFunction(fogFunc,
+                         {In(mPSInDepth), In(mFogParams), In(mFogColour), In(mPSOutDiffuse), Out(mPSOutDiffuse)});
     return true;
 }
 
@@ -311,8 +291,10 @@ bool RTShaderSRSTexturedFog::preAddToRenderState(const RenderState* renderState,
     // Override scene fog since it will happen in shader.
     dstPass->setFog(true, FOG_NONE, ColourValue::White, newFogDensity, newFogStart, newFogEnd); 
 
-    TextureUnitState* tus = dstPass->createTextureUnitState(mFactory->getBackgroundTextureName());
-    tus->setCubicTextureName(mFactory->getBackgroundTextureName(), true);
+    TextureUnitState* tus = dstPass->createTextureUnitState();
+    auto tex = TextureManager::getSingleton().load(
+        mFactory->getBackgroundTextureName(), RGN_DEFAULT, TEX_TYPE_CUBE_MAP);
+    tus->setTexture(tex);
     mBackgroundSamplerIndex = dstPass->getNumTextureUnitStates() - 1;
 
     return true;

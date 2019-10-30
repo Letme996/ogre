@@ -26,6 +26,8 @@
  -----------------------------------------------------------------------------
  */
 #include "DefaultSamplesPlugin.h"
+
+#include "OgreComponents.h"
 #include "BezierPatch.h"
 #include "BSP.h"
 #include "CameraTrack.h"
@@ -48,9 +50,10 @@
 #ifdef OGRE_BUILD_COMPONENT_HLMS
 #   include "HLMS.h"
 #endif
-#include "Instancing.h"
+#include "ImGuiDemo.h"
 #include "Isosurf.h"
 #include "Lighting.h"
+#include "LightShafts.h"
 #include "MeshLod.h"
 #include "NewInstancing.h"
 #include "OceanDemo.h"
@@ -95,8 +98,8 @@ DefaultSamplesPlugin::DefaultSamplesPlugin() : SamplePlugin("DefaultSamplesPlugi
     addSample(new Sample_FacialAnimation);
     addSample(new Sample_Grass);
     addSample(new Sample_DualQuaternion);
-    addSample(new Sample_Instancing);
     addSample(new Sample_Isosurf);
+    addSample(new Sample_ImGui);
     addSample(new Sample_NewInstancing);
     addSample(new Sample_TextureArray);
     addSample(new Sample_Tessellation);
@@ -108,6 +111,7 @@ DefaultSamplesPlugin::DefaultSamplesPlugin() : SamplePlugin("DefaultSamplesPlugi
     addSample(new Sample_VolumeTex);
     addSample(new Sample_Shadows);
     addSample(new Sample_Lighting);
+    addSample(new Sample_LightShafts);
     addSample(new Sample_MeshLod);
     addSample(new Sample_ParticleFX);
     addSample(new Sample_ParticleGS);

@@ -31,7 +31,6 @@ public:
         static SharedData* getSingletonPtr(void);
 
         // shared data across the application
-        Ogre::Real iLastFrameTime;
         Ogre::Root *iRoot;
         Ogre::Camera *iCamera;
         Ogre::RenderWindow *iWindow;
@@ -40,12 +39,9 @@ public:
         bool iActivate;
         bool iGlobalActivate;
 
-        // Animation state for light swarm
-        Ogre::AnimationState* mMLAnimState;
-
         Ogre::Light *iMainLight;
 
-        Ogre::vector<Ogre::Node*>::type mLightNodes;
+        std::vector<Ogre::Node*> mLightNodes;
 
 };
 

@@ -55,6 +55,9 @@ namespace Ogre {
         virtual bool attachDepthBuffer( DepthBuffer *depthBuffer );
         virtual void detachDepthBuffer();
         virtual void _detachDepthBuffer();
+
+        GLContext* getContext() const { return mFB.getContext(); }
+        GLFrameBufferObjectCommon* getFBO() { return &mFB; }
     protected:
         GLFrameBufferObject mFB;
     };
@@ -84,10 +87,6 @@ namespace Ogre {
         */
         virtual GLFBORenderTexture *createRenderTexture(const String &name, 
             const GLSurfaceDesc &target, bool writeGamma, uint fsaa);
-
-        /** Create a multi render target 
-        */
-        virtual MultiRenderTarget* createMultiRenderTarget(const String & name);
         
         /** Request a render buffer. If format is GL_NONE, return a zero buffer.
         */
@@ -107,7 +106,7 @@ namespace Ogre {
         void detectFBOFormats();
         GLuint _tryFormat(GLenum depthFormat, GLenum stencilFormat);
         bool _tryPackedFormat(GLenum packedFormat);
-        void _createTempFramebuffer(GLuint fmt, GLuint &fb, GLuint &tid);
+        void _createTempFramebuffer(GLuint internalfmt, GLuint fmt, GLenum type, GLuint &fb, GLuint &tid);
     };
     
 

@@ -52,6 +52,18 @@ void StringTests::TearDown()
 {
 }
 //--------------------------------------------------------------------------
+TEST_F(StringTests,SplitBaseFilename)
+{
+    String base, ext;
+
+    StringUtil::splitBaseFilename("basename.ext", base, ext);
+    EXPECT_EQ("basename", base);
+    EXPECT_EQ("ext", ext);
+
+    StringUtil::splitBaseFilename("basename.", base, ext);
+    EXPECT_EQ("basename", base);
+    EXPECT_EQ("", ext);
+}
 TEST_F(StringTests,SplitFileNameNoPath)
 {
     String basename, path;
@@ -163,39 +175,41 @@ TEST_F(StringTests,ParseReal)
     EXPECT_NE(r, StringConverter::parseReal("23,454"));
 }
 //--------------------------------------------------------------------------
-TEST_F(StringTests,ParseInt)
+TEST_F(StringTests,ParseInt32)
 {
-    int r = -223546;
+    int32 r = -223546;
 
     String s = StringConverter::toString(r);
-    int t = StringConverter::parseInt(s);
+    int32 t = StringConverter::parseInt(s);
 
     EXPECT_EQ(r, t);
 }
 //--------------------------------------------------------------------------
-TEST_F(StringTests,ParseLong)
+TEST_F(StringTests,ParseInt64)
 {
     long r = -2147483647;
 
     String s = StringConverter::toString(r);
-    long t = StringConverter::parseLong(s);
+    int64 t;
+    StringConverter::parse(s, t);
 
     EXPECT_EQ(r, t);
 }
 //--------------------------------------------------------------------------
-TEST_F(StringTests,ParseUnsignedLong)
+TEST_F(StringTests,ParseUInt64)
 {
-    unsigned long r = 4294967295UL;
+    uint64 r = ~0;
 
     String s = StringConverter::toString(r);
-    unsigned long t = StringConverter::parseUnsignedLong(s);
+    uint64 t;
+    StringConverter::parse(s, t);
 
     EXPECT_EQ(r, t);
 }
 //--------------------------------------------------------------------------
 TEST_F(StringTests,ParseSizeT)
 {
-    size_t r = 223546;
+    size_t r = ~0;
 
     String s = StringConverter::toString(r);
     size_t t = StringConverter::parseSizeT(s);

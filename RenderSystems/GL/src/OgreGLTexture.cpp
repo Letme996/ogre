@@ -103,15 +103,18 @@ namespace Ogre {
     //* Creation / loading methods ********************************************
     void GLTexture::createInternalResourcesImpl(void)
     {
-        if (!GLEW_VERSION_1_2 && mTextureType == TEX_TYPE_3D)
-            OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED, 
-                "3D Textures not supported before OpenGL 1.2", 
-                "GLTexture::createInternalResourcesImpl");
-
         if (!GLEW_VERSION_2_0 && mTextureType == TEX_TYPE_2D_ARRAY)
             OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED, 
                 "2D texture arrays not supported before OpenGL 2.0", 
                 "GLTexture::createInternalResourcesImpl");
+
+        if (mTextureType == TEX_TYPE_EXTERNAL_OES) {
+            OGRE_EXCEPT(
+                Exception::ERR_RENDERINGAPI_ERROR,
+                "TEX_TYPE_EXTERNAL_OES is not available for openGL",
+                "GLTexture::createInternalResourcesImpl"
+            );
+        }
 
         // Convert to nearest power-of-two size if required
         mWidth = GLPixelUtil::optionalPO2(mWidth);      
@@ -129,8 +132,7 @@ namespace Ogre {
             mNumMipmaps = maxMips;
 
         // Check if we can do HW mipmap generation
-        mMipmapsHardwareGenerated =
-            Root::getSingleton().getRenderSystem()->getCapabilities()->hasCapability(RSC_AUTOMIPMAP);
+        mMipmapsHardwareGenerated = true;
         
         // Generate texture name
         glGenTextures( 1, &mTextureID );
@@ -139,21 +141,10 @@ namespace Ogre {
         mRenderSystem->_getStateCacheManager()->bindGLTexture( getGLTextureTarget(), mTextureID );
         
         // This needs to be set otherwise the texture doesn't get rendered
-        if (GLEW_VERSION_1_2)
-            mRenderSystem->_getStateCacheManager()->setTexParameteri(getGLTextureTarget(),
-                GL_TEXTURE_MAX_LEVEL, mNumMipmaps);
-        
-        // Set some misc default parameters so NVidia won't complain, these can of course be changed later
-        mRenderSystem->_getStateCacheManager()->setTexParameteri(getGLTextureTarget(), GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        mRenderSystem->_getStateCacheManager()->setTexParameteri(getGLTextureTarget(), GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        if (GLEW_VERSION_1_2)
-        {
-            mRenderSystem->_getStateCacheManager()->setTexParameteri(getGLTextureTarget(), GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-            mRenderSystem->_getStateCacheManager()->setTexParameteri(getGLTextureTarget(), GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        }
+        mRenderSystem->_getStateCacheManager()->setTexParameteri(getGLTextureTarget(), GL_TEXTURE_MAX_LEVEL,
+                                                                 mNumMipmaps);
 
-        if((mUsage & TU_AUTOMIPMAP) &&
-            mNumRequestedMipmaps && mMipmapsHardwareGenerated)
+        if ((mUsage & TU_AUTOMIPMAP) && mNumRequestedMipmaps)
         {
             mRenderSystem->_getStateCacheManager()->setTexParameteri( getGLTextureTarget(), GL_GENERATE_MIPMAP, GL_TRUE );
         }
@@ -175,7 +166,7 @@ namespace Ogre {
             // Provide temporary buffer filled with zeroes as glCompressedTexImageXD does not
             // accept a 0 pointer like normal glTexImageXD
             // Run through this process for every mipmap to pregenerate mipmap piramid
-            vector<uint8>::type tmpdata(size);
+            std::vector<uint8> tmpdata(size);
             
             for(uint32 mip=0; mip<=mNumMipmaps; mip++)
             {
@@ -206,6 +197,13 @@ namespace Ogre {
                         }
                         break;
                     case TEX_TYPE_2D_RECT:
+                        break;
+                    case TEX_TYPE_EXTERNAL_OES:
+                        OGRE_EXCEPT(
+                            Exception::ERR_RENDERINGAPI_ERROR,
+                            "Attempt to create mipmaps for unsupported TEX_TYPE_EXTERNAL_OES, should never happen",
+                            "GLTexture::createInternalResourcesImpl"
+                        );
                         break;
                 };
                 if(width>1)
@@ -250,6 +248,13 @@ namespace Ogre {
                         break;
                     case TEX_TYPE_2D_RECT:
                         break;
+                    case TEX_TYPE_EXTERNAL_OES:
+                        OGRE_EXCEPT(
+                            Exception::ERR_RENDERINGAPI_ERROR,
+                            "Attempt to create mipmaps for unsupported TEX_TYPE_EXTERNAL_OES, should never happen",
+                            "GLTexture::createInternalResourcesImpl"
+                        );
+                        break;
                 };
                 if(width>1)
                     width = width/2;
@@ -263,35 +268,11 @@ namespace Ogre {
         // Get final internal format
         mFormat = getBuffer(0,0)->getFormat();
     }
-    
-    void GLTexture::loadImpl()
-    {
-        if( mUsage & TU_RENDERTARGET )
-        {
-            createRenderTexture();
-            return;
-        }
-
-        LoadedImages loadedImages;
-        // Now the only copy is on the stack and will be cleaned in case of
-        // exceptions being thrown from _loadImages
-        std::swap(loadedImages, mLoadedImages);
-
-        // Call internal _loadImages, not loadImage since that's external and 
-        // will determine load status etc again
-        ConstImagePtrList imagePtrs;
-        for (size_t i=0 ; i<loadedImages.size() ; ++i) {
-            imagePtrs.push_back(&loadedImages[i]);
-        }
-
-        _loadImages(imagePtrs);
-    }
 
     //*************************************************************************
     
     void GLTexture::freeInternalResourcesImpl()
     {
-        mSurfaceList.clear();
         if (GLStateCacheManager* stateCacheManager = mRenderSystem->_getStateCacheManager())
         {
             glDeleteTextures(1, &mTextureID);

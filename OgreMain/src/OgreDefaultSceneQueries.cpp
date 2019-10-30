@@ -43,34 +43,31 @@ namespace Ogre {
     void DefaultIntersectionSceneQuery::execute(IntersectionSceneQueryListener* listener)
     {
         // Iterate over all movable types
-        Root::MovableObjectFactoryIterator factIt = 
-            Root::getSingleton().getMovableObjectFactoryIterator();
-        while(factIt.hasMoreElements())
+        const auto& factories = Root::getSingleton().getMovableObjectFactories();
+        auto factIt = factories.begin();
+        while(factIt != factories.end())
         {
-            SceneManager::MovableObjectIterator objItA = 
-                mParentSceneMgr->getMovableObjectIterator(
-                    factIt.getNext()->getType());
-            while (objItA.hasMoreElements())
+            const auto& objsA = mParentSceneMgr->getMovableObjects((factIt++)->first);
+            auto objItA = objsA.begin();
+            while (objItA != objsA.end())
             {
-                MovableObject* a = objItA.getNext();
+                MovableObject* a = (objItA++)->second;
                 // skip entire section if type doesn't match
                 if (!(a->getTypeFlags() & mQueryTypeMask))
                     break;
 
                 // Skip if a does not pass the mask
-                if (!(a->getQueryFlags() & mQueryMask) ||
-                    !a->isInScene())
+                if (!(a->getQueryFlags() & mQueryMask) || !a->isInScene())
                     continue;
 
                 // Check against later objects in the same group
-                SceneManager::MovableObjectIterator objItB = objItA;
-                while (objItB.hasMoreElements())
+                auto objItB = objItA;
+                while (objItB != objsA.end())
                 {
-                    MovableObject* b = objItB.getNext();
+                    MovableObject* b = (objItB++)->second;
 
                     // Apply mask to b (both must pass)
-                    if ((b->getQueryFlags() & mQueryMask) && 
-                        b->isInScene())
+                    if ((b->getQueryFlags() & mQueryMask) && b->isInScene())
                     {
                         const AxisAlignedBox& box1 = a->getWorldBoundingBox();
                         const AxisAlignedBox& box2 = b->getWorldBoundingBox();
@@ -82,22 +79,19 @@ namespace Ogre {
                     }
                 }
                 // Check  against later groups
-                Root::MovableObjectFactoryIterator factItLater = factIt;
-                while (factItLater.hasMoreElements())
+                auto factItLater = factIt;
+                while (factItLater != factories.end())
                 {
-                    SceneManager::MovableObjectIterator objItC = 
-                        mParentSceneMgr->getMovableObjectIterator(
-                            factItLater.getNext()->getType());
-                    while (objItC.hasMoreElements())
+                    for (const auto& objItC :
+                         mParentSceneMgr->getMovableObjects((factItLater++)->first))
                     {
-                        MovableObject* c = objItC.getNext();
+                        MovableObject* c = objItC.second;
                         // skip entire section if type doesn't match
                         if (!(c->getTypeFlags() & mQueryTypeMask))
                             break;
 
                         // Apply mask to c (both must pass)
-                        if ((c->getQueryFlags() & mQueryMask) &&
-                            c->isInScene())
+                        if ((c->getQueryFlags() & mQueryMask) && c->isInScene())
                         {
                             const AxisAlignedBox& box1 = a->getWorldBoundingBox();
                             const AxisAlignedBox& box2 = c->getWorldBoundingBox();
@@ -133,22 +127,16 @@ namespace Ogre {
     void DefaultAxisAlignedBoxSceneQuery::execute(SceneQueryListener* listener)
     {
         // Iterate over all movable types
-        Root::MovableObjectFactoryIterator factIt = 
-            Root::getSingleton().getMovableObjectFactoryIterator();
-        while(factIt.hasMoreElements())
+        for(const auto& factIt : Root::getSingleton().getMovableObjectFactories())
         {
-            SceneManager::MovableObjectIterator objItA = 
-                mParentSceneMgr->getMovableObjectIterator(
-                factIt.getNext()->getType());
-            while (objItA.hasMoreElements())
+            for (const auto& objIt : mParentSceneMgr->getMovableObjects(factIt.first))
             {
-                MovableObject* a = objItA.getNext();
+                MovableObject* a = objIt.second;
                 // skip whole group if type doesn't match
                 if (!(a->getTypeFlags() & mQueryTypeMask))
                     break;
 
-                if ((a->getQueryFlags() & mQueryMask) && 
-                    a->isInScene() &&
+                if ((a->getQueryFlags() & mQueryMask) && a->isInScene() &&
                     mAABB.intersects(a->getWorldBoundingBox()))
                 {
                     if (!listener->queryResult(a)) return;
@@ -177,26 +165,19 @@ namespace Ogre {
         // required to fulfil the query
 
         // Iterate over all movable types
-        Root::MovableObjectFactoryIterator factIt = 
-            Root::getSingleton().getMovableObjectFactoryIterator();
-        while(factIt.hasMoreElements())
+        for(const auto& factIt : Root::getSingleton().getMovableObjectFactories())
         {
-            SceneManager::MovableObjectIterator objItA = 
-                mParentSceneMgr->getMovableObjectIterator(
-                factIt.getNext()->getType());
-            while (objItA.hasMoreElements())
+            for (const auto& objIt : mParentSceneMgr->getMovableObjects(factIt.first))
             {
-                MovableObject* a = objItA.getNext();
+                MovableObject* a = objIt.second;
                 // skip whole group if type doesn't match
                 if (!(a->getTypeFlags() & mQueryTypeMask))
                     break;
 
-                if( (a->getQueryFlags() & mQueryMask) &&
-                    a->isInScene())
+                if ((a->getQueryFlags() & mQueryMask) && a->isInScene())
                 {
                     // Do ray / box test
-                    std::pair<bool, Real> result =
-                        mRay.intersects(a->getWorldBoundingBox());
+                    std::pair<bool, Real> result = mRay.intersects(a->getWorldBoundingBox());
 
                     if (result.first)
                     {
@@ -224,22 +205,16 @@ namespace Ogre {
         Sphere testSphere;
 
         // Iterate over all movable types
-        Root::MovableObjectFactoryIterator factIt = 
-            Root::getSingleton().getMovableObjectFactoryIterator();
-        while(factIt.hasMoreElements())
+        for(const auto& factIt : Root::getSingleton().getMovableObjectFactories())
         {
-            SceneManager::MovableObjectIterator objItA = 
-                mParentSceneMgr->getMovableObjectIterator(
-                factIt.getNext()->getType());
-            while (objItA.hasMoreElements())
+            for (const auto& objIt : mParentSceneMgr->getMovableObjects(factIt.first))
             {
-                MovableObject* a = objItA.getNext();
+                MovableObject* a = objIt.second;
                 // skip whole group if type doesn't match
                 if (!(a->getTypeFlags() & mQueryTypeMask))
                     break;
                 // Skip unattached
-                if (!a->isInScene() || 
-                    !(a->getQueryFlags() & mQueryMask))
+                if (!a->isInScene() || !(a->getQueryFlags() & mQueryMask))
                     continue;
 
                 // Do sphere / sphere test
@@ -268,28 +243,19 @@ namespace Ogre {
     void DefaultPlaneBoundedVolumeListSceneQuery::execute(SceneQueryListener* listener)
     {
         // Iterate over all movable types
-        Root::MovableObjectFactoryIterator factIt = 
-            Root::getSingleton().getMovableObjectFactoryIterator();
-        while(factIt.hasMoreElements())
+        for(const auto& factIt : Root::getSingleton().getMovableObjectFactories())
         {
-            SceneManager::MovableObjectIterator objItA = 
-                mParentSceneMgr->getMovableObjectIterator(
-                factIt.getNext()->getType());
-            while (objItA.hasMoreElements())
+            for (const auto& objIt : mParentSceneMgr->getMovableObjects(factIt.first))
             {
-                MovableObject* a = objItA.getNext();
+                MovableObject* a = objIt.second;
                 // skip whole group if type doesn't match
                 if (!(a->getTypeFlags() & mQueryTypeMask))
                     break;
 
-                PlaneBoundedVolumeList::iterator pi, piend;
-                piend = mVolumes.end();
-                for (pi = mVolumes.begin(); pi != piend; ++pi)
+                for (const auto& vol : mVolumes)
                 {
-                    PlaneBoundedVolume& vol = *pi;
                     // Do AABB / plane volume test
-                    if ((a->getQueryFlags() & mQueryMask) && 
-                        a->isInScene() && 
+                    if ((a->getQueryFlags() & mQueryMask) && a->isInScene() &&
                         vol.intersects(a->getWorldBoundingBox()))
                     {
                         if (!listener->queryResult(a)) return;

@@ -124,7 +124,7 @@ namespace Ogre {
     }
     //-----------------------------------------------------------------------
     void BillboardParticleRenderer::_updateRenderQueue(RenderQueue* queue, 
-        list<Particle*>::type& currentParticles, bool cullIndividually)
+        std::list<Particle*>& currentParticles, bool cullIndividually)
     {
         mBillboardSet->setCullIndividually(cullIndividually);
 
@@ -136,17 +136,18 @@ namespace Ogre {
         Billboard bb;
         Affine3 invWorld;
 
-        if (mBillboardSet->getBillboardsInWorldSpace() && mBillboardSet->getParentSceneNode())
+        bool invert = mBillboardSet->getBillboardsInWorldSpace() && mBillboardSet->getParentSceneNode();
+        if (invert)
             invWorld = mBillboardSet->getParentSceneNode()->_getFullTransform().inverse();
 
-        for (list<Particle*>::type::iterator i = currentParticles.begin();
+        for (std::list<Particle*>::iterator i = currentParticles.begin();
             i != currentParticles.end(); ++i)
         {
             Particle* p = *i;
             bb.mPosition = p->mPosition;
             Vector3 pos = p->mPosition;
 
-            if (mBillboardSet->getBillboardsInWorldSpace() && mBillboardSet->getParentSceneNode())
+            if (invert)
                 pos = invWorld * pos;
 
             bboxMin.makeFloor( pos );

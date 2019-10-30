@@ -67,7 +67,11 @@ private:
         bool removed; // Whether the triangle is excluded from hull.
         CHVertex* vertex[3];
         Vector3 normal;
-        void computeNormal();
+        void computeNormal()
+        {
+            normal = Math::calculateBasicFaceNormal(vertex[0]->position, vertex[1]->position,
+                                                    vertex[2]->position);
+        }
     };
 
     
@@ -78,10 +82,10 @@ private:
         bool isInsideHull;
     };
 
-    typedef vector<OutsideData>::type OutsideDataList;
-    typedef vector<CHTriangle>::type CHTriangleList;
-    typedef vector<CHTriangle*>::type CHTrianglePList;
-    typedef vector<std::pair<CHVertex*, CHVertex*> >::type CHEdgeList;
+    typedef std::vector<OutsideData> OutsideDataList;
+    typedef std::vector<CHTriangle> CHTriangleList;
+    typedef std::vector<CHTriangle*> CHTrianglePList;
+    typedef std::vector<std::pair<CHVertex*, CHVertex*> > CHEdgeList;
 
 
 

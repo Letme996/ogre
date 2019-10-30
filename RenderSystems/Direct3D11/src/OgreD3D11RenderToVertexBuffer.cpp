@@ -61,7 +61,7 @@ namespace Ogre {
         op.operationType = mOperationType;
         op.useIndexes = false;
         op.useGlobalInstancingVertexBufferIsAvailable = false;
-        op.vertexData = mVertexData;
+        op.vertexData = mVertexData.get();
     }
 
     void D3D11RenderToVertexBuffer::setupGeometryShaderLinkageToStreamOut(Pass* pass)
@@ -118,7 +118,7 @@ namespace Ogre {
             //Use current front buffer to render to back buffer
             renderOp.operationType = mOperationType;
             renderOp.useIndexes = false;
-            renderOp.vertexData = mVertexData;
+            renderOp.vertexData = mVertexData.get();
             targetBufferIndex = 1 - mFrontBufferIndex;
         }
 
@@ -131,10 +131,6 @@ namespace Ogre {
         RenderSystem* targetRenderSystem = Root::getSingleton().getRenderSystem();
 
         //Draw the object
-        targetRenderSystem->_setWorldMatrix(Matrix4::IDENTITY);
-        targetRenderSystem->_setViewMatrix(Matrix4::IDENTITY);
-        targetRenderSystem->_setProjectionMatrix(Matrix4::IDENTITY);
-
         D3D11HardwareVertexBuffer* vertexBuffer = static_cast<D3D11HardwareVertexBuffer*>(mVertexBuffers[targetBufferIndex].get());
     
         UINT offset[1] = { 0 };

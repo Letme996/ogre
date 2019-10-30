@@ -47,9 +47,9 @@ namespace Ogre {
         mNativeDisplay = EGL_DEFAULT_DISPLAY;
         mGLDisplay = getGLDisplay();
         
-        mCurrentMode.first.first = 800;
-        mCurrentMode.first.second = 600; 
-        mCurrentMode.second = 0;
+        mCurrentMode.width = 800;
+        mCurrentMode.height = 600;
+        mCurrentMode.refreshRate = 0;
         mOriginalMode = mCurrentMode;
         mVideoModes.push_back(mCurrentMode);
     }
@@ -85,8 +85,7 @@ namespace Ogre {
                 if (eglGetConfigAttrib(mGLDisplay, configs[config], attribList[attrib], &value) == EGL_FALSE)
                 {
                     OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR,
-                                "Failed to get config attribute",
-                                __FUNCTION__);
+                                "Failed to get config attribute");
 
                     *nElements = 0;
                     free(configs);

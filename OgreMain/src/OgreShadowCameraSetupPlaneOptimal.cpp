@@ -45,8 +45,8 @@ namespace Ogre
     // --------------------------------------------------------------------
     Matrix4 PlaneOptimalShadowCameraSetup::computeConstrainedProjection(
         const Vector4& pinhole, 
-        const vector<Vector4>::type& fpoint, 
-        const vector<Vector2>::type& constraint) const
+        const std::vector<Vector4>& fpoint, 
+        const std::vector<Vector2>& constraint) const
     {
         // NOTE: will assume the z coordinates should be decided such that
         // the first 3 points (in fpoint) will have post projective
@@ -65,17 +65,17 @@ namespace Ogre
         }
 
         // allocate memory
-        PreciseReal **mat = NULL;
-        PreciseReal **backmat = NULL;
+        double **mat = NULL;
+        double **backmat = NULL;
         {
-            mat = OGRE_ALLOC_T(PreciseReal*, 11, MEMCATEGORY_SCENE_CONTROL);
+            mat = OGRE_ALLOC_T(double*, 11, MEMCATEGORY_SCENE_CONTROL);
             if(incrPrecision)
-                backmat = OGRE_ALLOC_T(PreciseReal*, 11, MEMCATEGORY_SCENE_CONTROL);
+                backmat = OGRE_ALLOC_T(double*, 11, MEMCATEGORY_SCENE_CONTROL);
             for(i=0; i<11; i++) 
             {
-                mat[i] = OGRE_ALLOC_T(PreciseReal, 11, MEMCATEGORY_SCENE_CONTROL);
+                mat[i] = OGRE_ALLOC_T(double, 11, MEMCATEGORY_SCENE_CONTROL);
                 if(incrPrecision)
-                    backmat[i] = OGRE_ALLOC_T(PreciseReal, 11, MEMCATEGORY_SCENE_CONTROL);
+                    backmat[i] = OGRE_ALLOC_T(double, 11, MEMCATEGORY_SCENE_CONTROL);
             }
         }
 
@@ -85,8 +85,8 @@ namespace Ogre
         // we choose a nonzero element of the last row to set to the arbitrary
         // constant 1.0.
         int nzind = 3;
-        PreciseReal col[11];
-        PreciseReal backcol[11];
+        double col[11];
+        double backcol[11];
 
         // fill in light position constraints
         mat[0][0] = pinhole.x;
@@ -105,7 +105,7 @@ namespace Ogre
         mat[1][7] = pinhole.w;
         col[1] = 0.0;
 
-        PreciseReal larr[4];
+        double larr[4];
         larr[0] = pinhole.x;
         larr[1] = pinhole.y;
         larr[2] = pinhole.z;
@@ -185,7 +185,7 @@ namespace Ogre
         {
             for (int k=0; k<3; k++)
             {
-                PreciseReal nvec[11];
+                double nvec[11];
                 for(i=0; i<11; i++)
                 {
                     int j;
@@ -207,7 +207,7 @@ namespace Ogre
             }
         }
 
-        PreciseReal row4[4];
+        double row4[4];
         ind = 8;
         for(i=0; i<4; i++)
         {
@@ -219,7 +219,7 @@ namespace Ogre
 
 
         // now solve for the 3rd row which affects depth precision
-        PreciseReal zrow[4];
+        double zrow[4];
 
         // we want the affine skew such that isoplanes of constant depth are parallel to
         // the world plane of interest
@@ -283,7 +283,7 @@ namespace Ogre
     // --------------------------------------------------------------------
 
     /// Construct object to consider a specified plane of interest
-    PlaneOptimalShadowCameraSetup::PlaneOptimalShadowCameraSetup(MovablePlane* plane)
+    PlaneOptimalShadowCameraSetup::PlaneOptimalShadowCameraSetup(const MovablePlane* plane)
     {
         mPlane = plane;
     }
@@ -304,7 +304,7 @@ namespace Ogre
         Matrix4 camProjection = cam->getProjectionMatrix() * cam->getViewMatrix();
 
         // get the world points to constrain
-        vector<Vector4>::type vhull;
+        std::vector<Vector4> vhull;
         cam->forwardIntersect(worldPlane, &vhull);
         if (vhull.size() < 4)
             return;
@@ -340,7 +340,7 @@ namespace Ogre
         vhull.resize(4);
 
         // get the post-projective coordinate constraints
-        vector<Vector2>::type constraint;
+        std::vector<Vector2> constraint;
         for (int i=0; i<4; i++)
         {
             Vector4 postProjPt = camProjection * vhull[i];
@@ -363,7 +363,7 @@ namespace Ogre
             // It's point or spotlight
             Vector4 displacement = oldPt - pinhole;
             Vector3 displace3    = Vector3(displacement.x, displacement.y, displacement.z);
-            Real dotProd = fabs(displace3.dotProduct(worldPlane.normal));
+            Real dotProd = std::fabs(displace3.dotProduct(worldPlane.normal));
             static const Real NEAR_FACTOR = 0.05;
             newPt = pinhole + (displacement * (cam->getNearClipDistance() * NEAR_FACTOR / dotProd));
         }

@@ -44,120 +44,8 @@ namespace Ogre {
 
     EGLSupport::EGLSupport(int profile)
         : GLNativeSupport(profile), mGLDisplay(0),
-          mNativeDisplay(0),
-      mRandr(false)
+          mNativeDisplay(0)
     {
-    }
-
-    void EGLSupport::addConfig(void)
-    {
-        ConfigOption optFullScreen;
-        ConfigOption optVideoMode;
-        ConfigOption optDisplayFrequency;
-        ConfigOption optFSAA;
-        ConfigOption optVSync;
-
-        optFullScreen.name = "Full Screen";
-        optFullScreen.immutable = false;
-
-        optVideoMode.name = "Video Mode";
-        optVideoMode.immutable = false;
-
-        optDisplayFrequency.name = "Display Frequency";
-        optDisplayFrequency.immutable = false;
-
-        optVSync.name = "VSync";
-        optVSync.possibleValues.push_back("No");
-        optVSync.possibleValues.push_back("Yes");
-        optVSync.currentValue = optVSync.possibleValues[1];
-        optVSync.immutable = false;
-
-        optFSAA.name = "FSAA";
-        optFSAA.immutable = false;
-
-        optFullScreen.possibleValues.push_back("No");
-        optFullScreen.possibleValues.push_back("Yes");
-
-        optFullScreen.currentValue = optFullScreen.possibleValues[0];
-
-        VideoModes::const_iterator value = mVideoModes.begin();
-        VideoModes::const_iterator end = mVideoModes.end();
-
-        for (; value != end; value++)
-        {
-            String mode = StringConverter::toString(value->first.first,4) + " x " + StringConverter::toString(value->first.second,4);
-            optVideoMode.possibleValues.push_back(mode);
-        }
-        removeDuplicates(optVideoMode.possibleValues);
-
-        optVideoMode.currentValue = StringConverter::toString(mCurrentMode.first.first,4) + " x " + StringConverter::toString(mCurrentMode.first.second,4);
-
-        refreshConfig();
-        if (!mSampleLevels.empty())
-        {
-            StringVector::const_iterator sampleValue = mSampleLevels.begin();
-            StringVector::const_iterator sampleEnd = mSampleLevels.end();
-
-            for (; sampleValue != sampleEnd; sampleValue++)
-            {
-                optFSAA.possibleValues.push_back(*sampleValue);
-            }
-
-            optFSAA.currentValue = optFSAA.possibleValues[0];
-        }
-
-        mOptions[optFullScreen.name] = optFullScreen;
-        mOptions[optVideoMode.name] = optVideoMode;
-        mOptions[optDisplayFrequency.name] = optDisplayFrequency;
-        mOptions[optFSAA.name] = optFSAA;
-        mOptions[optVSync.name] = optVSync;
-
-        refreshConfig();
-    }
-
-    void EGLSupport::refreshConfig(void) 
-    {
-        ConfigOptionMap::iterator optVideoMode = mOptions.find("Video Mode");
-        ConfigOptionMap::iterator optDisplayFrequency = mOptions.find("Display Frequency");
-
-        if (optVideoMode != mOptions.end() && optDisplayFrequency != mOptions.end())
-        {
-            optDisplayFrequency->second.possibleValues.clear();
-
-            VideoModes::const_iterator value = mVideoModes.begin();
-            VideoModes::const_iterator end = mVideoModes.end();
-
-            for (; value != end; value++)
-            {
-                String mode = StringConverter::toString(value->first.first,4) + " x " + StringConverter::toString(value->first.second,4);
-
-                if (mode == optVideoMode->second.currentValue)
-                {
-                    String frequency = StringConverter::toString(value->second) + " MHz";
-
-                    optDisplayFrequency->second.possibleValues.push_back(frequency);
-                }
-            }
-
-            if (!optDisplayFrequency->second.possibleValues.empty())
-            {
-                optDisplayFrequency->second.currentValue = optDisplayFrequency->second.possibleValues[0];
-            }
-            else
-            {
-                optVideoMode->second.currentValue = StringConverter::toString(mVideoModes[0].first.first,4) + " x " + StringConverter::toString(mVideoModes[0].first.second,4);
-                optDisplayFrequency->second.currentValue = StringConverter::toString(mVideoModes[0].second) + " MHz";
-            }
-        }
-    }
-
-    void EGLSupport::setConfigOption(const String &name, const String &value)
-    {
-        GLNativeSupport::setConfigOption(name, value);
-        if (name == "Video Mode")
-        {
-            refreshConfig();
-        }
     }
 
     EGLDisplay EGLSupport::getGLDisplay(void)
@@ -195,9 +83,7 @@ namespace Ogre {
 
         if (eglChooseConfig(mGLDisplay, attribList, NULL, 0, nElements) == EGL_FALSE)
         {
-            OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR,
-                        "Failed to choose config",
-                        __FUNCTION__);
+            OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR, "Failed to choose config");
 
             *nElements = 0;
             return 0;
@@ -206,9 +92,7 @@ namespace Ogre {
         configs = (EGLConfig*) malloc(*nElements * sizeof(EGLConfig));
         if (eglChooseConfig(mGLDisplay, attribList, configs, *nElements, nElements) == EGL_FALSE)
         {
-            OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR,
-                        "Failed to choose config",
-                        __FUNCTION__);
+            OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR, "Failed to choose config");
 
             *nElements = 0;
             free(configs);
@@ -224,9 +108,7 @@ namespace Ogre {
 
         if (eglGetConfigs(mGLDisplay, NULL, 0, nElements) == EGL_FALSE)
         {
-            OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR,
-                        "Failed to choose config",
-                        __FUNCTION__);
+            OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR, "Failed to choose config");
 
             *nElements = 0;
             return 0;
@@ -235,9 +117,7 @@ namespace Ogre {
         configs = (EGLConfig*) malloc(*nElements * sizeof(EGLConfig));
         if (eglGetConfigs(mGLDisplay, configs, *nElements, nElements) == EGL_FALSE)
         {
-            OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR,
-                        "Failed to choose config",
-                        __FUNCTION__);
+            OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR, "Failed to choose config");
 
             *nElements = 0;
             free(configs);
@@ -256,36 +136,41 @@ namespace Ogre {
         return status;
     }
 
-    void* EGLSupport::getProcAddress(const char* name)
+    void* EGLSupport::getProcAddress(const char* name) const
     {
         return (void*)eglGetProcAddress(name);
     }
 
     ::EGLConfig EGLSupport::getGLConfigFromContext(::EGLContext context)
     {
-        ::EGLConfig glConfig = 0;
+        ::EGLConfig glConfig;
+        EGLint id = 0;
+        ::EGLConfig *configs;
+        EGLint numConfigs;
 
-        if (eglQueryContext(mGLDisplay, context, EGL_CONFIG_ID, (EGLint *) &glConfig) == EGL_FALSE)
+        if (eglQueryContext(mGLDisplay, context, EGL_CONFIG_ID, &id) == EGL_FALSE)
         {
-            OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR,
-                        "Fail to get config from context",
-                        __FUNCTION__);
+            OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR, "Fail to get config from context");
             return 0;
         }
         EGL_CHECK_ERROR
+        configs = getConfigs(&numConfigs);
+        glConfig = configs[id];
+        free(configs);
         return glConfig;
     }
 
     ::EGLConfig EGLSupport::getGLConfigFromDrawable(::EGLSurface drawable,
                                                     unsigned int *w, unsigned int *h)
     {
-        ::EGLConfig glConfig = 0;
+        ::EGLConfig glConfig;
+        EGLint id = 0;
+        ::EGLConfig *configs;
+        EGLint numConfigs;
 
-        if (eglQuerySurface(mGLDisplay, drawable, EGL_CONFIG_ID, (EGLint *) &glConfig) == EGL_FALSE)
+        if (eglQuerySurface(mGLDisplay, drawable, EGL_CONFIG_ID, &id) == EGL_FALSE)
         {
-            OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR,
-                        "Fail to get config from drawable",
-                        __FUNCTION__);
+            OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR, "Fail to get config from drawable");
             return 0;
         }
         EGL_CHECK_ERROR
@@ -293,6 +178,9 @@ namespace Ogre {
         EGL_CHECK_ERROR
         eglQuerySurface(mGLDisplay, drawable, EGL_HEIGHT, (EGLint *) h);
         EGL_CHECK_ERROR
+        configs = getConfigs(&numConfigs);
+        glConfig = configs[id];
+        free(configs);
         return glConfig;
     }
 
@@ -410,50 +298,8 @@ namespace Ogre {
 
     void EGLSupport::switchMode(void)
     {
-        return switchMode(mOriginalMode.first.first,
-                          mOriginalMode.first.second, mOriginalMode.second);
-    }
-
-    NameValuePairList EGLSupport::parseOptions(uint& w, uint& h, bool& fullscreen)
-    {
-        ConfigOptionMap::iterator opt;
-        ConfigOptionMap::iterator end = mOptions.end();
-        NameValuePairList miscParams;
-
-        fullscreen = false;
-        w = 640, h = 480;
-
-        if ((opt = mOptions.find("Full Screen")) != end)
-        {
-            fullscreen = (opt->second.currentValue == "Yes");
-        }
-
-        if ((opt = mOptions.find("Display Frequency")) != end)
-        {
-            miscParams["displayFrequency"] = opt->second.currentValue;
-        }
-
-        if ((opt = mOptions.find("Video Mode")) != end)
-        {
-            String val = opt->second.currentValue;
-            String::size_type pos = val.find('x');
-
-            if (pos != String::npos)
-            {
-                w = StringConverter::parseUnsignedInt(val.substr(0, pos));
-                h = StringConverter::parseUnsignedInt(val.substr(pos + 1));
-            }
-        }
-
-        if ((opt = mOptions.find("FSAA")) != end)
-        {
-            miscParams["FSAA"] = opt->second.currentValue;
-        }
-
-        if((opt = mOptions.find("VSync")) != end)
-            miscParams["vsync"] = opt->second.currentValue;
-
-        return miscParams;
+        return switchMode(mOriginalMode.width,
+                          mOriginalMode.height, mOriginalMode.refreshRate);
     }
 
     ::EGLContext EGLSupport::createNewContext(EGLDisplay eglDisplay,
@@ -491,9 +337,7 @@ namespace Ogre {
 
         if (!context)
         {
-            OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR,
-                        "Fail to create New context",
-                        __FUNCTION__);
+            OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR, "Fail to create New context");
             return 0;
         }
 

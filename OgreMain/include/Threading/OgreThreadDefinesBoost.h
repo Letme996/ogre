@@ -26,9 +26,6 @@ THE SOFTWARE
 #ifndef __OgreThreadDefinesBoost_H__
 #define __OgreThreadDefinesBoost_H__
 
-#define OGRE_TOKEN_PASTE(x, y) x ## y
-#define OGRE_TOKEN_PASTE_EXTRA(x, y) OGRE_TOKEN_PASTE(x, y)
-
 // Thread objects and related functions
 #define OGRE_THREAD_TYPE boost::thread
 #define OGRE_THREAD_CREATE(name, worker) boost::thread* name = OGRE_NEW_T(boost::thread, MEMCATEGORY_GENERAL)(worker)
@@ -43,16 +40,16 @@ THE SOFTWARE
 
 // Read-write mutex
 #define OGRE_WQ_RW_MUTEX(name) mutable boost::shared_mutex name
-#define OGRE_WQ_LOCK_RW_MUTEX_READ(name) boost::shared_lock<boost::shared_mutex> OGRE_TOKEN_PASTE_EXTRA(ogrenameLock, __LINE__) (name)
-#define OGRE_WQ_LOCK_RW_MUTEX_WRITE(name) boost::unique_lock<boost::shared_mutex> OGRE_TOKEN_PASTE_EXTRA(ogrenameLock, __LINE__) (name)
+#define OGRE_WQ_LOCK_RW_MUTEX_READ(name) boost::shared_lock<boost::shared_mutex> OGRE_TOKEN_PASTE(ogrenameLock, __LINE__) (name)
+#define OGRE_WQ_LOCK_RW_MUTEX_WRITE(name) boost::unique_lock<boost::shared_mutex> OGRE_TOKEN_PASTE(ogrenameLock, __LINE__) (name)
 
 #define OGRE_WQ_MUTEX(name) mutable boost::recursive_mutex name
 #if BOOST_THREAD_VERSION < 4
-#define OGRE_WQ_LOCK_MUTEX(name) boost::recursive_mutex::scoped_lock OGRE_TOKEN_PASTE_EXTRA(ogrenameLock, __LINE__) (name)
+#define OGRE_WQ_LOCK_MUTEX(name) boost::recursive_mutex::scoped_lock OGRE_TOKEN_PASTE(ogrenameLock, __LINE__) (name)
 #define OGRE_WQ_LOCK_MUTEX_NAMED(mutexName, lockName) boost::recursive_mutex::scoped_lock lockName(mutexName)
 #define OGRE_WQ_THREAD_SYNCHRONISER(sync) boost::condition sync
 #else
-#define OGRE_WQ_LOCK_MUTEX(name) boost::unique_lock<boost::recursive_mutex> OGRE_TOKEN_PASTE_EXTRA(ogrenameLock, __LINE__) (name)
+#define OGRE_WQ_LOCK_MUTEX(name) boost::unique_lock<boost::recursive_mutex> OGRE_TOKEN_PASTE(ogrenameLock, __LINE__) (name)
 #define OGRE_WQ_LOCK_MUTEX_NAMED(mutexName, lockName) boost::unique_lock<boost::recursive_mutex> lockName(mutexName)
 #define OGRE_WQ_THREAD_SYNCHRONISER(sync) boost::condition_variable_any sync
 #endif
@@ -77,14 +74,6 @@ THE SOFTWARE
 #define OGRE_COPY_AUTO_SHARED_MUTEX(from) assert(!OGRE_AUTO_MUTEX_NAME); OGRE_AUTO_MUTEX_NAME = from
 #define OGRE_SET_AUTO_SHARED_MUTEX_NULL OGRE_AUTO_MUTEX_NAME = 0
 #define OGRE_MUTEX_CONDITIONAL(mutex) if (mutex)
-
-// Thread-local pointer
-#define OGRE_THREAD_POINTER(T, var) boost::thread_specific_ptr<T> var
-#define OGRE_THREAD_POINTER_INIT(var) var()
-#define OGRE_THREAD_POINTER_VAR(T, var) boost::thread_specific_ptr<T> var
-#define OGRE_THREAD_POINTER_SET(var, expr) var.reset(expr)
-#define OGRE_THREAD_POINTER_GET(var) var.get()
-#define OGRE_THREAD_POINTER_DELETE(var) var.reset(0)
 
 // Utility
 #define OGRE_THREAD_ID_TYPE boost::thread::id

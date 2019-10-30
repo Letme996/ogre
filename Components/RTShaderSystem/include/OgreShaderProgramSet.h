@@ -54,33 +54,23 @@ public:
     /** Class destructor */
     ~ProgramSet();
 
-    /** Get the vertex shader CPU program. */
-    Program* getCpuVertexProgram();
+    /** Get the shader CPU program. */
+    Program* getCpuProgram(GpuProgramType type) const;
 
-    /** Get the fragment shader CPU program. */
-    Program* getCpuFragmentProgram();
-
-    /** Get the vertex shader GPU program. */
-    GpuProgramPtr getGpuVertexProgram();
-
-    /** Get the fragment shader GPU program. */
-    GpuProgramPtr getGpuFragmentProgram();
+    /** Get the shader GPU program. */
+    const GpuProgramPtr& getGpuProgram(GpuProgramType type) const;
 
     // Protected methods.
 protected:
-    void setCpuVertexProgram(Program* vsCpuProgram);
-    void setCpuFragmentProgram(Program* psCpuProgram);
-
-    void setGpuVertexProgram(GpuProgramPtr vsGpuProgram);
-    void setGpuFragmentProgram(GpuProgramPtr psGpuProgram);
-
+    void setCpuProgram(std::unique_ptr<Program>&& program);
+    void setGpuProgram(const GpuProgramPtr& program);
 
     // Attributes.
 protected:
     // Vertex shader CPU program.
-    Program* mVSCpuProgram;
+    std::unique_ptr<Program> mVSCpuProgram;
     // Fragment shader CPU program.
-    Program* mPSCpuProgram;
+    std::unique_ptr<Program> mPSCpuProgram;
     // Vertex shader GPU program.
     GpuProgramPtr mVSGpuProgram;
     // Fragment shader CPU program.

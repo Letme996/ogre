@@ -273,6 +273,19 @@ namespace Ogre
                 "D3D11RenderWindowBase::_queryDxgiDevice");
         }
     }
+
+    uint D3D11RenderWindowBase::getNumberOfViews() const { return 1; }
+
+    ID3D11Texture2D* D3D11RenderWindowBase::getSurface(uint index) const
+    {
+        return index == 0 ? mpBackBuffer.Get() : NULL;
+    }
+
+    ID3D11RenderTargetView* D3D11RenderWindowBase::getRenderTargetView(uint index) const
+    {
+        return index == 0 ? mRenderTargetView.Get() : NULL;
+    }
+
     //---------------------------------------------------------------------
     void D3D11RenderWindowBase::getCustomAttribute( const String& name, void* pData )
     {
@@ -280,32 +293,14 @@ namespace Ogre
         // D3DDEVICE            : getD3DDevice
         // WINDOW               : getWindowHandle
 
-        if( name == "D3DDEVICE" )
+        if (name == "D3DDEVICE")
         {
-            *(ID3D11DeviceN **)pData = mDevice.get();
-        }
-        else if( name == "isTexture" )
-        {
-            *(bool*)pData = false;
-        }
-        else if( name == "ID3D11RenderTargetView" )
-        {
-            *(ID3D11RenderTargetView**)pData = mRenderTargetView.Get();
-        }
-        else if( name == "ID3D11Texture2D" )
-        {
-            *(ID3D11Texture2D**)pData = mpBackBuffer.Get();
-        }
-        else if( name == "numberOfViews" )
-        {
-            *(unsigned*)pData = 1;
-        }
-        else if( name == "DDBACKBUFFER" )
-        {
-            *(ID3D11Texture2D**)pData = NULL;
+            *(ID3D11DeviceN**)pData = mDevice.get();
         }
         else
+        {
             RenderWindow::getCustomAttribute(name, pData);
+        }
     }
     //---------------------------------------------------------------------
     void D3D11RenderWindowBase::copyContentsToMemory(const Box& src, const PixelBox &dst, FrameBuffer buffer)
@@ -664,6 +659,7 @@ namespace Ogre
         D3D11RenderWindowSwapChainBased::create(name, width, height, fullScreen, miscParams);
 
         HWND parentHWnd = 0;
+        WNDPROC windowProc = DefWindowProc;
         HWND externalHandle = 0;
         String title = name;
 
@@ -699,6 +695,9 @@ namespace Ogre
             opt = miscParams->find("parentWindowHandle");
             if(opt != miscParams->end())
                 parentHWnd = (HWND)StringConverter::parseSizeT(opt->second);
+            opt = miscParams->find("windowProc");
+            if (opt != miscParams->end())
+                windowProc = reinterpret_cast<WNDPROC>(StringConverter::parseSizeT(opt->second));
             // externalWindowHandle     -> externalHandle
             opt = miscParams->find("externalWindowHandle");
             if(opt != miscParams->end())
@@ -838,10 +837,10 @@ namespace Ogre
 				classStyle |= CS_DBLCLKS;
 
 			HINSTANCE hInst = NULL;
-			static const TCHAR staticVar;
+			static TCHAR staticVar;
 			GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, &staticVar, &hInst);
 
-			WNDCLASS wc = { classStyle, DefWindowProc, 0, 0, hInst,
+			WNDCLASS wc = { classStyle, windowProc, 0, 0, hInst,
 				LoadIcon(0, IDI_APPLICATION), LoadCursor(NULL, IDC_ARROW),
 				(HBRUSH)GetStockObject(BLACK_BRUSH), 0, OGRE_D3D11_WIN_CLASS_NAME };
 			RegisterClass(&wc);

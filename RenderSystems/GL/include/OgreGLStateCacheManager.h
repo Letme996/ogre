@@ -44,7 +44,7 @@ namespace Ogre
             TexParameteriMap mTexParameteriMap;
         };
 
-        typedef OGRE_HashMap<GLuint, TextureUnitParams> TexUnitsMap;
+        typedef std::unordered_map<GLuint, TextureUnitParams> TexUnitsMap;
 
         /* These variables are used for caching OpenGL state.
          They are cached because state changes can be quite expensive,
@@ -52,23 +52,19 @@ namespace Ogre
          */
 
         /// Stores textures currently bound to each texture stage
-        OGRE_HashMap <GLenum, GLuint> mBoundTextures;
+        std::unordered_map <GLenum, GLuint> mBoundTextures;
 
         struct TexGenParams
         {
             std::set<GLenum> mEnabled;
         };
         /// Stores the currently enabled texcoord generation types per texture unit
-        OGRE_HashMap <GLenum, TexGenParams> mTextureCoordGen;
+        std::unordered_map <GLenum, TexGenParams> mTextureCoordGen;
 
         /// A map of texture parameters for each texture unit
         TexUnitsMap mTexUnitsMap;
         /// Stores the current polygon rendering mode
         GLenum mPolygonMode;
-        /// Stores the current blend source function
-        GLenum mBlendFuncSource;
-        /// Stores the current blend destination function
-        GLenum mBlendFuncDest;
         /// Stores the last bound texture id
         GLuint mLastBoundTexID;
 
@@ -132,19 +128,11 @@ namespace Ogre
          */
         bool activateGLTextureUnit(size_t unit);
 
-        /** Sets the current blend equation setting.
-         @param eq The blend equation to use.
-         */
-        void setBlendEquation(GLenum eq);
-
         /// Set the blend equation for RGB and alpha separately.
         void setBlendEquation(GLenum eqRGB, GLenum eqA);
 
-        /** Sets the blending function.
-         @param source The blend mode for the source.
-         @param dest The blend mode for the destination
-         */
-        void setBlendFunc(GLenum source, GLenum dest);
+        /// Set the blend function for RGB and alpha separately.
+        void setBlendFunc(GLenum source, GLenum dest, GLenum sourceA, GLenum destA);
 
         void setShadeModel(GLenum model);
 
@@ -234,7 +222,7 @@ namespace Ogre
         void setMaterialSpecular(GLfloat r, GLfloat g, GLfloat b, GLfloat a);
         void setMaterialShininess(GLfloat shininess);
         void setPointSize(GLfloat size);
-        void setPointParameters(GLfloat* attenuation, float minSize, float maxSize);
+        void setPointParameters(const GLfloat* attenuation, float minSize = -1, float maxSize = -1);
 
         void setViewport(GLint x, GLint y, GLsizei width, GLsizei height);
 

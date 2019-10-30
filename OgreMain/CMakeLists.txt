@@ -11,13 +11,13 @@
 # OgreMain core library
 ############################################################
 
-PROJECT(OgreMain)
-
 # define header and source files for the library
 file(GLOB HEADER_FILES "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
 list(APPEND HEADER_FILES
-    ${CMAKE_BINARY_DIR}/include/OgreBuildSettings.h
-    ${CMAKE_BINARY_DIR}/include/OgreExports.h)
+    ${PROJECT_BINARY_DIR}/include/OgreBuildSettings.h
+    ${PROJECT_BINARY_DIR}/include/OgreComponents.h
+    ${PROJECT_BINARY_DIR}/include/OgreExports.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/Ogre.i)
 
 file(GLOB SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
@@ -63,6 +63,10 @@ elseif(ANDROID)
   include_directories(${ANDROID_NDK}/sources/android/cpufeatures)
 
   file(GLOB PLATFORM_SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/Android/*.cpp")
+  # Remove optional platform source files
+  list(REMOVE_ITEM PLATFORM_SOURCE_FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/Android/OgreAPKZipArchive.cpp"
+  )
 elseif (UNIX)
   file(GLOB PLATFORM_SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/GLX/*.cpp")
 
@@ -73,7 +77,6 @@ if(NOT WIN32)
     list(APPEND PLATFORM_SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/OgreSearchOps.cpp")
 endif()
 
-include_directories("${ZLIB_INCLUDE_DIRS}" "${ZZip_INCLUDE_DIRS}")
 # Configure threading files
 file(GLOB THREAD_HEADER_FILES "${CMAKE_CURRENT_SOURCE_DIR}/include/Threading/*.h")
 include_directories("include/Threading" "src/")
@@ -129,7 +132,7 @@ endif ()
 
 list(APPEND HEADER_FILES ${THREAD_HEADER_FILES})
 
-set(LIBRARIES ${PLATFORM_LIBS})
+set(LIBRARIES)
 
 if (OGRE_CONFIG_THREADS)
   list(APPEND LIBRARIES ${OGRE_THREAD_LIBRARIES})
@@ -156,16 +159,30 @@ if (OGRE_CONFIG_ENABLE_ASTC)
 endif ()
 
 if (OGRE_CONFIG_ENABLE_ZIP)
+  include_directories("${ZZip_INCLUDE_DIRS}")
   list(APPEND HEADER_FILES include/OgreZip.h)
   list(APPEND SOURCE_FILES src/OgreZip.cpp)
 
   if(ANDROID)
     ADD_DEFINITIONS(-DZZIP_OMIT_CONFIG_H)
+    list(APPEND PLATFORM_SOURCE_FILES src/Android/OgreAPKZipArchive.cpp)
   endif()
 
   list(APPEND LIBRARIES "${ZZip_LIBRARIES}")
-  list(APPEND LIBRARIES "${ZLIB_LIBRARIES}")
+  list(APPEND LIBRARIES ZLIB::ZLIB)
 endif ()
+
+if(OGRE_CONFIG_FILESYSTEM_UNICODE)
+  set_source_files_properties(src/OgreFileSystem.cpp
+    PROPERTIES COMPILE_DEFINITIONS _OGRE_FILESYSTEM_ARCHIVE_UNICODE)
+  set_source_files_properties(src/OgreZip.cpp
+    PROPERTIES COMPILE_DEFINITIONS _OGRE_FILESYSTEM_ARCHIVE_UNICODE)
+endif()
+
+if(OGRE_PROFILING_REMOTERY_PATH)
+  list(APPEND SOURCE_FILES ${OGRE_PROFILING_REMOTERY_PATH}/Remotery.c)
+  set_source_files_properties(src/OgreProfiler.cpp PROPERTIES COMPILE_DEFINITIONS USE_REMOTERY)
+endif()
 
 set (TARGET_LINK_FLAGS "")
 
@@ -182,9 +199,13 @@ generate_export_header(OgreMain
     EXPORT_MACRO_NAME _OgreExport
     NO_EXPORT_MACRO_NAME _OgrePrivate
     DEPRECATED_MACRO_NAME OGRE_DEPRECATED
-    EXPORT_FILE_NAME ${CMAKE_BINARY_DIR}/include/OgreExports.h)
+    EXPORT_FILE_NAME ${PROJECT_BINARY_DIR}/include/OgreExports.h)
 
-target_include_directories(OgreMain PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include" "${OGRE_BINARY_DIR}/include" ${PLATFORM_INCLUDE})
+target_include_directories(OgreMain PUBLIC 
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>" 
+  "$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>"
+  $<INSTALL_INTERFACE:include/OGRE>
+  PRIVATE "${OGRE_PROFILING_REMOTERY_PATH}")
 
 # In visual studio 2010 - 64 bit we get this error: "LINK : fatal error LNK1210: exceeded internal ILK size limit; link with /INCREMENTAL:NO"
 if(WIN32 AND MSVC10 AND CMAKE_CL_64)
@@ -216,15 +237,15 @@ if (APPLE)
   
     if(OGRE_BUILD_LIBS_AS_FRAMEWORKS)
       add_custom_command(TARGET OgreMain POST_BUILD
-          COMMAND mkdir ARGS -p ${OGRE_BINARY_DIR}/lib/${OGRE_OSX_BUILD_CONFIGURATION}/Ogre.framework/Headers/Threading
+          COMMAND mkdir ARGS -p ${PROJECT_BINARY_DIR}/lib/${OGRE_OSX_BUILD_CONFIGURATION}/Ogre.framework/Headers/Threading
           COMMAND ditto
-          ${OGRE_SOURCE_DIR}/OgreMain/include/Threading/*.h ${OGRE_BINARY_DIR}/lib/${OGRE_OSX_BUILD_CONFIGURATION}/Ogre.framework/Headers/Threading
-          COMMAND cd ${OGRE_BINARY_DIR}/lib/${OGRE_OSX_BUILD_CONFIGURATION}/Ogre.framework/Headers
+          ${PROJECT_SOURCE_DIR}/OgreMain/include/Threading/*.h ${PROJECT_BINARY_DIR}/lib/${OGRE_OSX_BUILD_CONFIGURATION}/Ogre.framework/Headers/Threading
+          COMMAND cd ${PROJECT_BINARY_DIR}/lib/${OGRE_OSX_BUILD_CONFIGURATION}/Ogre.framework/Headers
           )
 
       foreach(HEADER_PATH ${THREAD_HEADER_FILES})
           get_filename_component(HEADER_FILE ${HEADER_PATH} NAME)
-          set(FWK_HEADER_PATH ${OGRE_BINARY_DIR}/lib/${OGRE_OSX_BUILD_CONFIGURATION}/Ogre.framework/Headers/${HEADER_FILE})
+          set(FWK_HEADER_PATH ${PROJECT_BINARY_DIR}/lib/${OGRE_OSX_BUILD_CONFIGURATION}/Ogre.framework/Headers/${HEADER_FILE})
           add_custom_command(TARGET OgreMain POST_BUILD
               COMMAND rm -f ${FWK_HEADER_PATH}
               )
@@ -239,7 +260,7 @@ if (APPLE)
     set_target_properties(OgreMain PROPERTIES	OUTPUT_NAME Ogre)
   endif()
 endif ()
-target_link_libraries(OgreMain ${LIBRARIES} ${CMAKE_DL_LIBS})
+target_link_libraries(OgreMain PUBLIC ${PLATFORM_LIBS} PRIVATE ${LIBRARIES} ${CMAKE_DL_LIBS})
 
 # specify a precompiled header to use
 add_native_precompiled_header(OgreMain "${CMAKE_CURRENT_SOURCE_DIR}/src/OgreStableHeaders.h")

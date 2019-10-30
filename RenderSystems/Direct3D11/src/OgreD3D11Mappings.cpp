@@ -32,7 +32,7 @@ THE SOFTWARE.
 namespace Ogre 
 {
     //---------------------------------------------------------------------
-    D3D11_TEXTURE_ADDRESS_MODE D3D11Mappings::get(TextureUnitState::TextureAddressingMode tam)
+    D3D11_TEXTURE_ADDRESS_MODE D3D11Mappings::get(TextureAddressingMode tam)
     {
         D3D11RenderSystem* rsys = static_cast<D3D11RenderSystem*>(Root::getSingleton().getRenderSystem());
         if (rsys->_getFeatureLevel() == D3D_FEATURE_LEVEL_9_1)
@@ -459,7 +459,7 @@ namespace Ogre
         case DXGI_FORMAT_R16G16_SNORM:              return PF_UNKNOWN;
         case DXGI_FORMAT_R16G16_SINT:               return PF_R16G16_SINT;
         case DXGI_FORMAT_R32_TYPELESS:              return PF_UNKNOWN;
-        case DXGI_FORMAT_D32_FLOAT:                 return PF_DEPTH;
+        case DXGI_FORMAT_D32_FLOAT:                 return PF_DEPTH16;
         case DXGI_FORMAT_R32_FLOAT:                 return PF_FLOAT32_R;
         case DXGI_FORMAT_R32_UINT:                  return PF_UNKNOWN;
         case DXGI_FORMAT_R32_SINT:                  return PF_UNKNOWN;
@@ -480,7 +480,7 @@ namespace Ogre
         case DXGI_FORMAT_R16_SNORM:                 return PF_UNKNOWN;
         case DXGI_FORMAT_R16_SINT:                  return PF_UNKNOWN;
         case DXGI_FORMAT_R8_TYPELESS:               return PF_UNKNOWN;
-        case DXGI_FORMAT_R8_UNORM:                  return PF_L8;
+        case DXGI_FORMAT_R8_UNORM:                  return PF_R8;
         case DXGI_FORMAT_R8_UINT:                   return PF_UNKNOWN;
         case DXGI_FORMAT_R8_SNORM:                  return PF_UNKNOWN;
         case DXGI_FORMAT_R8_SINT:                   return PF_UNKNOWN;
@@ -545,9 +545,12 @@ namespace Ogre
     //---------------------------------------------------------------------
     DXGI_FORMAT D3D11Mappings::_getPF(PixelFormat ogrePF)
     {
+        // PF_L8 maps to DXGI_FORMAT_R8_UNORM and grayscale textures became "redscale", without green and blue components.
+        // This can be fixed by shader modification, but here we can only convert PF_L8 to PF_A8B8G8R8 manually to fix the issue.
+        // Note, that you can use PF_R8 to explicitly request "redscale" behavior for grayscale textures, avoiding overhead.
         switch(ogrePF)
         {
-        case PF_L8:             return DXGI_FORMAT_R8_UNORM;
+        case PF_R8:             return DXGI_FORMAT_R8_UNORM;
         case PF_L16:            return DXGI_FORMAT_R16_UNORM;
         case PF_A8:             return DXGI_FORMAT_A8_UNORM;
         case PF_BYTE_LA:        return DXGI_FORMAT_UNKNOWN; 
@@ -582,7 +585,6 @@ namespace Ogre
         case PF_BC7_UNORM:      return DXGI_FORMAT_BC7_UNORM;
         case PF_R16G16_SINT:    return DXGI_FORMAT_R16G16_SINT;
         case PF_FLOAT32_GR:     return DXGI_FORMAT_R32G32_FLOAT;         
-        case PF_UNKNOWN:
         default:                return DXGI_FORMAT_UNKNOWN;
         }
     }
@@ -742,8 +744,17 @@ namespace Ogre
 			}
 		}
 
-		return (isRenderTarget ? D3D11_BIND_RENDER_TARGET : 0)
-			| ((usage & TU_NOTSHADERRESOURCE) ? 0 : D3D11_BIND_SHADER_RESOURCE);
+        UINT retVal = 0;
+        if( !(usage & TU_NOT_SRV) )
+            retVal |= D3D11_BIND_SHADER_RESOURCE;
+
+        if( isRenderTarget )
+            retVal |= D3D11_BIND_RENDER_TARGET;
+
+        if( usage & TU_UAV )
+            retVal |= D3D11_BIND_UNORDERED_ACCESS;
+
+        return retVal;
 	}
 
     UINT D3D11Mappings::_getTextureMiscFlags(UINT bindflags, TextureType textype, TextureUsage usage)

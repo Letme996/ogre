@@ -75,10 +75,10 @@ namespace Ogre {
     {
         friend class ParticleSystemFactory;
     public:
-        typedef map<String, ParticleSystem*>::type ParticleTemplateMap;
-        typedef map<String, ParticleAffectorFactory*>::type ParticleAffectorFactoryMap;
-        typedef map<String, ParticleEmitterFactory*>::type ParticleEmitterFactoryMap;
-        typedef map<String, ParticleSystemRendererFactory*>::type ParticleSystemRendererFactoryMap;
+        typedef std::map<String, ParticleSystem*> ParticleTemplateMap;
+        typedef std::map<String, ParticleAffectorFactory*> ParticleAffectorFactoryMap;
+        typedef std::map<String, ParticleEmitterFactory*> ParticleEmitterFactoryMap;
+        typedef std::map<String, ParticleSystemRendererFactory*> ParticleSystemRendererFactoryMap;
     protected:
         OGRE_AUTO_MUTEX;
             
@@ -98,21 +98,6 @@ namespace Ogre {
 
         // Factory instance
         ParticleSystemFactory* mFactory;
-
-        /** Internal script parsing method. */
-        void parseNewEmitter(const String& type, DataStreamPtr& chunk, ParticleSystem* sys);
-        /** Internal script parsing method. */
-        void parseNewAffector(const String& type, DataStreamPtr& chunk, ParticleSystem* sys);
-        /** Internal script parsing method. */
-        void parseAttrib(const String& line, ParticleSystem* sys);
-        /** Internal script parsing method. */
-        void parseEmitterAttrib(const String& line, ParticleEmitter* sys);
-        /** Internal script parsing method. */
-        void parseAffectorAttrib(const String& line, ParticleAffector* sys);
-        /** Internal script parsing method. */
-        void skipToNextCloseBrace(DataStreamPtr& chunk);
-        /** Internal script parsing method. */
-        void skipToNextOpenBrace(DataStreamPtr& chunk);
 
         /// Internal implementation of createSystem
         ParticleSystem* createSystemImpl(const String& name, size_t quota, 

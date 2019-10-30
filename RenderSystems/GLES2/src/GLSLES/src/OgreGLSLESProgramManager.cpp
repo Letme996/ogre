@@ -26,7 +26,7 @@ THE SOFTWARE.
 -----------------------------------------------------------------------------
 */
 
-#include "../include/OgreGLSLESProgramManager.h"
+#include "OgreGLSLESProgramManager.h"
 #include "OgreGLSLESProgram.h"
 #include "OgreLogManager.h"
 #include "OgreStringConverter.h"
@@ -58,50 +58,52 @@ namespace Ogre {
     }
 
     //-----------------------------------------------------------------------
-    GLSLESProgramManager::GLSLESProgramManager(void) : mActiveVertexGpuProgram(NULL),
-        mActiveFragmentGpuProgram(NULL), mActiveProgram(NULL)
+    GLSLESProgramManager::GLSLESProgramManager(void) : mActiveProgram(NULL)
     {
+        mActiveShader.fill(NULL);
+
         // Fill in the relationship between type names and enums
-        mTypeEnumMap.insert(StringToEnumMap::value_type("float", GL_FLOAT));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("vec2", GL_FLOAT_VEC2));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("vec3", GL_FLOAT_VEC3));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("vec4", GL_FLOAT_VEC4));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("sampler2D", GL_SAMPLER_2D));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("samplerCube", GL_SAMPLER_CUBE));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("sampler2DShadow", GL_SAMPLER_2D_SHADOW_EXT));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("int", GL_INT));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("ivec2", GL_INT_VEC2));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("ivec3", GL_INT_VEC3));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("ivec4", GL_INT_VEC4));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("mat2", GL_FLOAT_MAT2));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("mat3", GL_FLOAT_MAT3));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("mat4", GL_FLOAT_MAT4));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("sampler3D", GL_SAMPLER_3D_OES));
+        mTypeEnumMap.emplace("float", GL_FLOAT);
+        mTypeEnumMap.emplace("vec2", GL_FLOAT_VEC2);
+        mTypeEnumMap.emplace("vec3", GL_FLOAT_VEC3);
+        mTypeEnumMap.emplace("vec4", GL_FLOAT_VEC4);
+        mTypeEnumMap.emplace("sampler2D", GL_SAMPLER_2D);
+        mTypeEnumMap.emplace("samplerCube", GL_SAMPLER_CUBE);
+        mTypeEnumMap.emplace("sampler2DShadow", GL_SAMPLER_2D_SHADOW_EXT);
+        mTypeEnumMap.emplace("samplerExternalOES", GL_SAMPLER_EXTERNAL_OES);
+        mTypeEnumMap.emplace("int", GL_INT);
+        mTypeEnumMap.emplace("ivec2", GL_INT_VEC2);
+        mTypeEnumMap.emplace("ivec3", GL_INT_VEC3);
+        mTypeEnumMap.emplace("ivec4", GL_INT_VEC4);
+        mTypeEnumMap.emplace("mat2", GL_FLOAT_MAT2);
+        mTypeEnumMap.emplace("mat3", GL_FLOAT_MAT3);
+        mTypeEnumMap.emplace("mat4", GL_FLOAT_MAT4);
+        mTypeEnumMap.emplace("sampler3D", GL_SAMPLER_3D_OES);
         // GLES3 types
-        mTypeEnumMap.insert(StringToEnumMap::value_type("mat2x3", GL_FLOAT_MAT2x3));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("mat3x2", GL_FLOAT_MAT3x2));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("mat3x4", GL_FLOAT_MAT3x4));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("mat4x3", GL_FLOAT_MAT4x3));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("mat2x4", GL_FLOAT_MAT2x4));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("mat4x2", GL_FLOAT_MAT4x2));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("bvec2", GL_BOOL_VEC2));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("bvec3", GL_BOOL_VEC3));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("bvec4", GL_BOOL_VEC4));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("uint", GL_UNSIGNED_INT));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("uvec2", GL_UNSIGNED_INT_VEC2));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("uvec3", GL_UNSIGNED_INT_VEC3));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("uvec4", GL_UNSIGNED_INT_VEC4));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("samplerCubeShadow", GL_SAMPLER_CUBE_SHADOW));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("sampler2DArray", GL_SAMPLER_2D_ARRAY));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("sampler2DArrayShadow", GL_SAMPLER_2D_ARRAY_SHADOW));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("isampler2D", GL_INT_SAMPLER_2D));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("isampler3D", GL_INT_SAMPLER_3D));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("isamplerCube", GL_INT_SAMPLER_CUBE));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("isampler2DArray", GL_INT_SAMPLER_2D_ARRAY));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("usampler2D", GL_UNSIGNED_INT_SAMPLER_2D));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("usampler3D", GL_UNSIGNED_INT_SAMPLER_3D));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("usamplerCube", GL_UNSIGNED_INT_SAMPLER_CUBE));
-        mTypeEnumMap.insert(StringToEnumMap::value_type("usampler2DArray", GL_UNSIGNED_INT_SAMPLER_2D_ARRAY));
+        mTypeEnumMap.emplace("mat2x3", GL_FLOAT_MAT2x3);
+        mTypeEnumMap.emplace("mat3x2", GL_FLOAT_MAT3x2);
+        mTypeEnumMap.emplace("mat3x4", GL_FLOAT_MAT3x4);
+        mTypeEnumMap.emplace("mat4x3", GL_FLOAT_MAT4x3);
+        mTypeEnumMap.emplace("mat2x4", GL_FLOAT_MAT2x4);
+        mTypeEnumMap.emplace("mat4x2", GL_FLOAT_MAT4x2);
+        mTypeEnumMap.emplace("bvec2", GL_BOOL_VEC2);
+        mTypeEnumMap.emplace("bvec3", GL_BOOL_VEC3);
+        mTypeEnumMap.emplace("bvec4", GL_BOOL_VEC4);
+        mTypeEnumMap.emplace("uint", GL_UNSIGNED_INT);
+        mTypeEnumMap.emplace("uvec2", GL_UNSIGNED_INT_VEC2);
+        mTypeEnumMap.emplace("uvec3", GL_UNSIGNED_INT_VEC3);
+        mTypeEnumMap.emplace("uvec4", GL_UNSIGNED_INT_VEC4);
+        mTypeEnumMap.emplace("samplerCubeShadow", GL_SAMPLER_CUBE_SHADOW);
+        mTypeEnumMap.emplace("sampler2DArray", GL_SAMPLER_2D_ARRAY);
+        mTypeEnumMap.emplace("sampler2DArrayShadow", GL_SAMPLER_2D_ARRAY_SHADOW);
+        mTypeEnumMap.emplace("isampler2D", GL_INT_SAMPLER_2D);
+        mTypeEnumMap.emplace("isampler3D", GL_INT_SAMPLER_3D);
+        mTypeEnumMap.emplace("isamplerCube", GL_INT_SAMPLER_CUBE);
+        mTypeEnumMap.emplace("isampler2DArray", GL_INT_SAMPLER_2D_ARRAY);
+        mTypeEnumMap.emplace("usampler2D", GL_UNSIGNED_INT_SAMPLER_2D);
+        mTypeEnumMap.emplace("usampler3D", GL_UNSIGNED_INT_SAMPLER_3D);
+        mTypeEnumMap.emplace("usamplerCube", GL_UNSIGNED_INT_SAMPLER_CUBE);
+        mTypeEnumMap.emplace("usampler2DArray", GL_UNSIGNED_INT_SAMPLER_2D_ARRAY);
 
         
 #if !OGRE_NO_GLES2_GLSL_OPTIMISER
@@ -135,13 +137,10 @@ namespace Ogre {
         // No active link program so find one or make a new one
         // Is there an active key?
         uint32 activeKey = 0;
-        if (mActiveVertexGpuProgram)
+        for(auto shader : mActiveShader)
         {
-            activeKey = HashCombine(activeKey, mActiveVertexGpuProgram->getShaderID());
-        }
-        if (mActiveFragmentGpuProgram)
-        {
-            activeKey = HashCombine(activeKey, mActiveFragmentGpuProgram->getShaderID());
+            if(!shader) continue;
+            activeKey = HashCombine(activeKey, shader->getShaderID());
         }
 
         // Only return a link program object if a vertex or fragment program exist
@@ -156,12 +155,12 @@ namespace Ogre {
                         RSC_SEPARATE_SHADER_OBJECTS))
                 {
                     mActiveProgram =
-                        new GLSLESProgramPipeline(mActiveVertexGpuProgram, mActiveFragmentGpuProgram);
+                        new GLSLESProgramPipeline(mActiveShader[GPT_VERTEX_PROGRAM], mActiveShader[GPT_FRAGMENT_PROGRAM]);
                 }
                 else
                 {
                     mActiveProgram =
-                        new GLSLESLinkProgram(mActiveVertexGpuProgram, mActiveFragmentGpuProgram);
+                        new GLSLESLinkProgram(mActiveShader[GPT_VERTEX_PROGRAM], mActiveShader[GPT_FRAGMENT_PROGRAM]);
                 }
 
                 mPrograms[activeKey] = mActiveProgram;
@@ -180,22 +179,11 @@ namespace Ogre {
     }
 
     //-----------------------------------------------------------------------
-    void GLSLESProgramManager::setActiveFragmentShader(GLSLESProgram* fragmentGpuProgram)
+    void GLSLESProgramManager::setActiveShader(GpuProgramType type, GLSLESProgram* gpuProgram)
     {
-        if (fragmentGpuProgram != mActiveFragmentGpuProgram)
+        if (gpuProgram != mActiveShader[type])
         {
-            mActiveFragmentGpuProgram = fragmentGpuProgram;
-            // ActiveLinkProgram is no longer valid
-            mActiveProgram = NULL;
-        }
-    }
-
-    //-----------------------------------------------------------------------
-    void GLSLESProgramManager::setActiveVertexShader(GLSLESProgram* vertexGpuProgram)
-    {
-        if (vertexGpuProgram != mActiveVertexGpuProgram)
-        {
-            mActiveVertexGpuProgram = vertexGpuProgram;
+            mActiveShader[type] = gpuProgram;
             // ActiveLinkProgram is no longer valid
             mActiveProgram = NULL;
         }
@@ -277,6 +265,9 @@ namespace Ogre {
             break;
         case GL_SAMPLER_2D_SHADOW_EXT:
             defToUpdate.constType = GCT_SAMPLER2DSHADOW;
+            break;
+        case GL_SAMPLER_EXTERNAL_OES:
+            defToUpdate.constType = GCT_SAMPLER_EXTERNAL_OES;
             break;
         case GL_INT:
             defToUpdate.constType = GCT_INT1;
@@ -395,7 +386,7 @@ namespace Ogre {
     void GLSLESProgramManager::extractUniforms(GLuint programObject,
         const GpuConstantDefinitionMap* vertexConstantDefs, 
         const GpuConstantDefinitionMap* fragmentConstantDefs,
-        GLUniformReferenceList& list, GLUniformBufferList& sharedList)
+        GLUniformReferenceList& list, SharedParamsBufferMap& sharedParamsBufferMap)
     {
         // Scan through the active uniforms and add them to the reference list
         GLint uniformCount = 0;
@@ -465,7 +456,7 @@ namespace Ogre {
             delete[] uniformName;
         }
 
-#if OGRE_NO_GLES3_SUPPORT == 0
+#if 0 // needs updating to GL3Plus code
         // Now deal with uniform blocks
 
         GLint blockCount = 0;

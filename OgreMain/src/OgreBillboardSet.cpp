@@ -47,8 +47,6 @@ namespace Ogre {
         mAccurateFacing(false),
         mAllDefaultRotation(true),
         mWorldSpace(false),
-        mVertexData(0),
-        mIndexData(0),
         mCullIndividual( false ),
         mBillboardType(BBT_POINT),
         mCommonDirection(Ogre::Vector3::UNIT_Z),
@@ -82,8 +80,6 @@ namespace Ogre {
         mAccurateFacing(false),
         mAllDefaultRotation(true),
         mWorldSpace(false),
-        mVertexData(0),
-        mIndexData(0),
         mCullIndividual( false ),
         mBillboardType(BBT_POINT),
         mCommonDirection(Ogre::Vector3::UNIT_Z),
@@ -552,14 +548,15 @@ namespace Ogre {
 
             iend = mActiveBillboards.end();
             Affine3 invWorld;
-            if (mWorldSpace && getParentSceneNode())
+            bool invert = mWorldSpace && getParentSceneNode();
+            if (invert)
                 invWorld = getParentSceneNode()->_getFullTransform().inverse();
 
             for (i = mActiveBillboards.begin(); i != iend; ++i)
             {
                 Vector3 pos = (*i)->getPosition();
                 // transform from world space to local space
-                if (mWorldSpace && getParentSceneNode())
+                if (invert)
                     pos = invWorld * pos;
                 min.makeFloor(pos);
                 max.makeCeil(pos);
@@ -652,7 +649,7 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void BillboardSet::getRenderOperation(RenderOperation& op)
     {
-        op.vertexData = mVertexData;
+        op.vertexData = mVertexData.get();
         op.vertexData->vertexStart = 0;
 
         if (mPointRendering)
@@ -670,7 +667,7 @@ namespace Ogre {
 
             op.vertexData->vertexCount = mNumVisibleBillboards * 4;
 
-            op.indexData = mIndexData;
+            op.indexData = mIndexData.get();
             op.indexData->indexCount = mNumVisibleBillboards * 6;
             op.indexData->indexStart = 0;
         }
@@ -763,7 +760,7 @@ namespace Ogre {
                 "expect.");
         }
 
-        mVertexData = OGRE_NEW VertexData();
+        mVertexData.reset(new VertexData());
         if (mPointRendering)
             mVertexData->vertexCount = mPoolSize;
         else
@@ -776,10 +773,8 @@ namespace Ogre {
         VertexBufferBinding* binding = mVertexData->vertexBufferBinding;
 
         size_t offset = 0;
-        decl->addElement(0, offset, VET_FLOAT3, VES_POSITION);
-        offset += VertexElement::getTypeSize(VET_FLOAT3);
-        decl->addElement(0, offset, VET_COLOUR, VES_DIFFUSE);
-        offset += VertexElement::getTypeSize(VET_COLOUR);
+        offset += decl->addElement(0, offset, VET_FLOAT3, VES_POSITION).getSize();
+        offset += decl->addElement(0, offset, VET_COLOUR, VES_DIFFUSE).getSize();
         // Texture coords irrelevant when enabled point rendering (generated
         // in point sprite mode, and unused in standard point mode)
         if (!mPointRendering)
@@ -798,7 +793,7 @@ namespace Ogre {
 
         if (!mPointRendering)
         {
-            mIndexData  = OGRE_NEW IndexData();
+            mIndexData.reset(new IndexData());
             mIndexData->indexStart = 0;
             mIndexData->indexCount = mPoolSize * 6;
 
@@ -819,10 +814,8 @@ namespace Ogre {
                 2-----3
             */
 
-            ushort* pIdx = static_cast<ushort*>(
-                mIndexData->indexBuffer->lock(0,
-                  mIndexData->indexBuffer->getSizeInBytes(),
-                  HardwareBuffer::HBL_DISCARD) );
+            HardwareBufferLockGuard indexLock(mIndexData->indexBuffer, HardwareBuffer::HBL_DISCARD);
+            ushort* pIdx = static_cast<ushort*>(indexLock.pData);
 
             for(
                 size_t idx, idxOff, bboard = 0;
@@ -841,29 +834,17 @@ namespace Ogre {
                 pIdx[idx+5] = static_cast<unsigned short>(idxOff + 3);
 
             }
-
-            mIndexData->indexBuffer->unlock();
         }
         mBuffersCreated = true;
     }
     //-----------------------------------------------------------------------
     void BillboardSet::_destroyBuffers(void)
     {
-        if (mVertexData)
-        {
-            OGRE_DELETE mVertexData;
-            mVertexData = 0;
-        }
-        if (mIndexData)
-        {
-            OGRE_DELETE mIndexData;
-            mIndexData = 0;
-        }
-
+        mVertexData.reset();
+        mIndexData.reset();
         mMainBuf.reset();
 
         mBuffersCreated = false;
-
     }
     //-----------------------------------------------------------------------
     unsigned int BillboardSet::getPoolSize(void) const

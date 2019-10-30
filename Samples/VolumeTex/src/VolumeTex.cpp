@@ -25,11 +25,9 @@ same license as the rest of the engine.
 #include "Julia.h"
 
 namespace {
-TexturePtr ptex;
 SimpleRenderable *vrend;
 SimpleRenderable *trend;
 SceneNode *snode,*fnode;
-AnimationState* mOgreAnimState = 0;
 }
 
 void Sample_VolumeTex::setupContent()
@@ -86,8 +84,10 @@ void Sample_VolumeTex::setupContent()
     key = track->createNodeKeyFrame(10);//C
     key->setTranslate(Vector3(0.0f, -15.0f, 0.0f));
     // Create a new animation state to track this
-    mOgreAnimState = mSceneMgr->createAnimationState("OgreTrack");
-    mOgreAnimState->setEnabled(true);
+    auto animState = mSceneMgr->createAnimationState("OgreTrack");
+    animState->setEnabled(true);
+    auto& controllerMgr = ControllerManager::getSingleton();
+    controllerMgr.createFrameTimePassthroughController(AnimationStateControllerValue::create(animState, true));
 
     //mFountainNode->attachObject(pSys2);
 
@@ -109,7 +109,6 @@ bool Sample_VolumeTex::frameRenderingQueued(const FrameEvent &evt)
     //snode->roll(Degree(evt.timeSinceLastFrame * 20.0f));
     //fnode->roll(Degree(evt.timeSinceLastFrame * 20.0f));
     static_cast<ThingRenderable*>(trend)->addTime(evt.timeSinceLastFrame * 0.05f);
-    mOgreAnimState->addTime(evt.timeSinceLastFrame);
     return SdkSample::frameRenderingQueued(evt);
 }
 

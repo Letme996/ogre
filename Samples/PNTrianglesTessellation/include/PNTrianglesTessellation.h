@@ -103,14 +103,8 @@ public:
         {
             // get the light pivot that corresponds to this checkbox
             SceneNode* pivot = box->getName() == "Light1" ? mLightPivot1 : mLightPivot2;
-            SceneNode::ObjectIterator it = pivot->getAttachedObjectIterator();
-
-            while (it.hasMoreElements())  // toggle visibility of light and billboard set
-            {
-                MovableObject* o = it.getNext();
-                o->setVisible(box->isChecked());
-            }
-
+            // toggle visibility of light and billboard set
+            pivot->setVisible(box->isChecked());
         }
         else if (box->getName() == "MoveLights")
         {
@@ -202,6 +196,12 @@ protected:
         mLightPivot1 = mSceneMgr->getRootSceneNode()->createChildSceneNode();
         mLightPivot2 = mSceneMgr->getRootSceneNode()->createChildSceneNode();
 
+        mLightPivot1->setPosition(Vector3(200, 0, 0));
+        mLightPivot2->setPosition(Vector3(-200, 0, 0));
+
+        mLightPivot1->setDirection(-Vector3::UNIT_X);        
+        mLightPivot2->setDirection(Vector3::UNIT_X);
+
         Light* l;
         BillboardSet* bbs;
 
@@ -209,32 +209,24 @@ protected:
         l = mSceneMgr->createLight();
         l->setDiffuseColour(1.0f, 1.0f, 1.0f);
         l->setSpecularColour(1.0f, 1.0f, 1.0f);
-        SceneNode* ln = mSceneMgr->getRootSceneNode()->createChildSceneNode();
-        ln->setPosition(Vector3(200, 0, 0));
-        ln->setDirection(-Vector3::UNIT_X);
-        ln->attachObject(l);
+        mLightPivot1->attachObject(l);
+
         // create white flare
         bbs = mSceneMgr->createBillboardSet();
         bbs->setMaterialName("Examples/Flare");
         bbs->createBillboard(200, 0, 0)->setColour(ColourValue::White);
-
-        mLightPivot1->attachObject(l);
         mLightPivot1->attachObject(bbs);
 
         // create red light
         l = mSceneMgr->createLight();
         l->setDiffuseColour(1.0f, 0.0f, 0.0f);
         l->setSpecularColour(1.0f, 0.0f, 0.0f);
-        ln = mSceneMgr->getRootSceneNode()->createChildSceneNode();
-        ln->setPosition(Vector3(-200, 0, 0));
-        ln->setDirection(Vector3::UNIT_X);
-        ln->attachObject(l);
+        mLightPivot2->attachObject(l);
+
         // create white flare
         bbs = mSceneMgr->createBillboardSet();
         bbs->setMaterialName("Examples/Flare");
         bbs->createBillboard(-200, 0, 0)->setColour(ColourValue::Red);
-
-        mLightPivot2->attachObject(l);
         mLightPivot2->attachObject(bbs);
     }
 

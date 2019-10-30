@@ -64,30 +64,22 @@ void OctreeIntersectionSceneQuery::execute(IntersectionSceneQueryListener* liste
     MovableSet set;
 
     // Iterate over all movable types
-    Root::MovableObjectFactoryIterator factIt = 
-        Root::getSingleton().getMovableObjectFactoryIterator();
-    while(factIt.hasMoreElements())
+    for(const auto& factIt : Root::getSingleton().getMovableObjectFactories())
     {
-        SceneManager::MovableObjectIterator it = 
-            mParentSceneMgr->getMovableObjectIterator(
-            factIt.getNext()->getType());
-        while( it.hasMoreElements() )
+        for (const auto& it : mParentSceneMgr->getMovableObjects(factIt.first))
         {
 
-            MovableObject * e = it.getNext();
+            MovableObject * e = it.second;
 
-            Ogre::list< SceneNode * >::type list;
+            std::list< SceneNode * > list;
             //find the nodes that intersect the AAB
             static_cast<OctreeSceneManager*>( mParentSceneMgr ) -> findNodesIn( e->getWorldBoundingBox(), list, 0 );
             //grab all moveables from the node that intersect...
-            Ogre::list< SceneNode * >::type::iterator nit = list.begin();
+            std::list< SceneNode * >::iterator nit = list.begin();
             while( nit != list.end() )
             {
-                SceneNode::ObjectIterator oit = (*nit) -> getAttachedObjectIterator();
-                while( oit.hasMoreElements() )
+                for (auto m : (*nit)->getAttachedObjects())
                 {
-                    MovableObject * m = oit.getNext();
-
                     if( m != e &&
                             set.find( MovablePair(e,m)) == set.end() &&
                             set.find( MovablePair(m,e)) == set.end() &&
@@ -101,10 +93,8 @@ void OctreeIntersectionSceneQuery::execute(IntersectionSceneQueryListener* liste
                         if (m->getMovableType() == "Entity")
                         {
                             Entity* e2 = static_cast<Entity*>(m);
-                            Entity::ChildObjectListIterator childIt = e2->getAttachedObjectIterator();
-                            while(childIt.hasMoreElements())
+                            for(auto c : e2->getAttachedObjects())
                             {
-                                MovableObject* c = childIt.getNext();
                                 if (c->getQueryFlags() & mQueryMask && 
                                     e->getWorldBoundingBox().intersects( c->getWorldBoundingBox() ))
                                 {
@@ -134,18 +124,16 @@ OctreeAxisAlignedBoxSceneQuery::~OctreeAxisAlignedBoxSceneQuery()
 /** Finds any entities that intersect the AAB for the query. */
 void OctreeAxisAlignedBoxSceneQuery::execute(SceneQueryListener* listener)
 {
-    list< SceneNode * >::type _list;
+    std::list< SceneNode * > _list;
     //find the nodes that intersect the AAB
     static_cast<OctreeSceneManager*>( mParentSceneMgr ) -> findNodesIn( mAABB, _list, 0 );
 
     //grab all moveables from the node that intersect...
-    list< SceneNode * >::type::iterator it = _list.begin();
+    std::list< SceneNode * >::iterator it = _list.begin();
     while( it != _list.end() )
     {
-        SceneNode::ObjectIterator oit = (*it) -> getAttachedObjectIterator();
-        while( oit.hasMoreElements() )
+        for (auto m : (*it)->getAttachedObjects())
         {
-            MovableObject * m = oit.getNext();
             if( (m->getQueryFlags() & mQueryMask) && 
                 (m->getTypeFlags() & mQueryTypeMask) && 
                 m->isInScene() &&
@@ -156,10 +144,8 @@ void OctreeAxisAlignedBoxSceneQuery::execute(SceneQueryListener* listener)
                 if (m->getMovableType() == "Entity")
                 {
                     Entity* e = static_cast<Entity*>(m);
-                    Entity::ChildObjectListIterator childIt = e->getAttachedObjectIterator();
-                    while(childIt.hasMoreElements())
+                    for (auto c : e->getAttachedObjects())
                     {
-                        MovableObject* c = childIt.getNext();
                         if (c->getQueryFlags() & mQueryMask)
                         {
                             listener->queryResult(c);
@@ -185,18 +171,16 @@ OctreeRaySceneQuery::~OctreeRaySceneQuery()
 //---------------------------------------------------------------------
 void OctreeRaySceneQuery::execute(RaySceneQueryListener* listener)
 {
-    list< SceneNode * >::type _list;
+    std::list< SceneNode * > _list;
     //find the nodes that intersect the AAB
     static_cast<OctreeSceneManager*>( mParentSceneMgr ) -> findNodesIn( mRay, _list, 0 );
 
     //grab all moveables from the node that intersect...
-    list< SceneNode * >::type::iterator it = _list.begin();
+    std::list< SceneNode * >::iterator it = _list.begin();
     while( it != _list.end() )
     {
-        SceneNode::ObjectIterator oit = (*it) -> getAttachedObjectIterator();
-        while( oit.hasMoreElements() )
+        for (auto m : (*it)->getAttachedObjects())
         {
-            MovableObject * m = oit.getNext();
             if( (m->getQueryFlags() & mQueryMask) && 
                 (m->getTypeFlags() & mQueryTypeMask) && m->isInScene() )
             {
@@ -209,10 +193,8 @@ void OctreeRaySceneQuery::execute(RaySceneQueryListener* listener)
                     if (m->getMovableType() == "Entity")
                     {
                         Entity* e = static_cast<Entity*>(m);
-                        Entity::ChildObjectListIterator childIt = e->getAttachedObjectIterator();
-                        while(childIt.hasMoreElements())
+                        for(auto c : e->getAttachedObjects())
                         {
-                            MovableObject* c = childIt.getNext();
                             if (c->getQueryFlags() & mQueryMask)
                             {
                                 result = mRay.intersects(c->getWorldBoundingBox());
@@ -244,18 +226,16 @@ OctreeSphereSceneQuery::~OctreeSphereSceneQuery()
 //---------------------------------------------------------------------
 void OctreeSphereSceneQuery::execute(SceneQueryListener* listener)
 {
-    list< SceneNode * >::type _list;
+    std::list< SceneNode * > _list;
     //find the nodes that intersect the AAB
     static_cast<OctreeSceneManager*>( mParentSceneMgr ) -> findNodesIn( mSphere, _list, 0 );
 
     //grab all moveables from the node that intersect...
-    list< SceneNode * >::type::iterator it = _list.begin();
+    std::list< SceneNode * >::iterator it = _list.begin();
     while( it != _list.end() )
     {
-        SceneNode::ObjectIterator oit = (*it) -> getAttachedObjectIterator();
-        while( oit.hasMoreElements() )
+        for (auto m : (*it)->getAttachedObjects())
         {
-            MovableObject * m = oit.getNext();
             if( (m->getQueryFlags() & mQueryMask) && 
                 (m->getTypeFlags() & mQueryTypeMask) && 
                 m->isInScene() && 
@@ -266,10 +246,8 @@ void OctreeSphereSceneQuery::execute(SceneQueryListener* listener)
                 if (m->getMovableType() == "Entity")
                 {
                     Entity* e = static_cast<Entity*>(m);
-                    Entity::ChildObjectListIterator childIt = e->getAttachedObjectIterator();
-                    while(childIt.hasMoreElements())
+                    for(auto c : e->getAttachedObjects())
                     {
-                        MovableObject* c = childIt.getNext();
                         if (c->getQueryFlags() & mQueryMask &&
                             mSphere.intersects( c->getWorldBoundingBox()))
                         {
@@ -296,28 +274,26 @@ OctreePlaneBoundedVolumeListSceneQuery::~OctreePlaneBoundedVolumeListSceneQuery(
 //---------------------------------------------------------------------
 void OctreePlaneBoundedVolumeListSceneQuery::execute(SceneQueryListener* listener)
 {
-    set<SceneNode*>::type checkedSceneNodes;
+    std::set<SceneNode*> checkedSceneNodes;
 
     PlaneBoundedVolumeList::iterator pi, piend;
     piend = mVolumes.end();
     for (pi = mVolumes.begin(); pi != piend; ++pi)
     {
-        list< SceneNode * >::type _list;
+        std::list< SceneNode * > _list;
         //find the nodes that intersect the AAB
         static_cast<OctreeSceneManager*>( mParentSceneMgr ) -> findNodesIn( *pi, _list, 0 );
 
         //grab all moveables from the node that intersect...
-        list< SceneNode * >::type::iterator it, itend;
+        std::list< SceneNode * >::iterator it, itend;
         itend = _list.end();
         for (it = _list.begin(); it != itend; ++it)
         {
             // avoid double-check same scene node
             if (!checkedSceneNodes.insert(*it).second)
                 continue;
-            SceneNode::ObjectIterator oit = (*it) -> getAttachedObjectIterator();
-            while( oit.hasMoreElements() )
+            for (auto m : (*it)->getAttachedObjects())
             {
-                MovableObject * m = oit.getNext();
                 if( (m->getQueryFlags() & mQueryMask) && 
                     (m->getTypeFlags() & mQueryTypeMask) && 
                     m->isInScene() &&
@@ -328,10 +304,8 @@ void OctreePlaneBoundedVolumeListSceneQuery::execute(SceneQueryListener* listene
                     if (m->getMovableType() == "Entity")
                     {
                         Entity* e = static_cast<Entity*>(m);
-                        Entity::ChildObjectListIterator childIt = e->getAttachedObjectIterator();
-                        while(childIt.hasMoreElements())
+                        for(auto c : e->getAttachedObjects())
                         {
-                            MovableObject* c = childIt.getNext();
                             if (c->getQueryFlags() & mQueryMask &&
                                 (*pi).intersects( c->getWorldBoundingBox()))
                             {

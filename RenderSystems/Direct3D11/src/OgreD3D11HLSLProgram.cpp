@@ -160,73 +160,16 @@ namespace Ogre {
         Resource* mProgram;
     };
 
-    void D3D11HLSLProgram::getDefines(String& stringBuffer, vector<D3D_SHADER_MACRO>::type& defines, const String& definesString)
+    void D3D11HLSLProgram::getDefines(String& stringBuffer, std::vector<D3D_SHADER_MACRO>& defines, const String& definesString)
     {
         // Populate preprocessor defines
         stringBuffer = definesString;
 
         defines.clear();
 
-        if (!stringBuffer.empty())
+        for(const auto& def : parseDefines(stringBuffer))
         {
-            // Split preprocessor defines and build up macro array
-            D3D_SHADER_MACRO macro;
-            String::size_type pos = stringBuffer.empty() ? String::npos : 0;
-            while (pos != String::npos)
-            {
-                macro.Name = &stringBuffer[pos];
-                macro.Definition = 0;
-
-                String::size_type start_pos=pos;
-
-                // Find delims
-                pos = stringBuffer.find_first_of(";,=", pos);
-
-                if(start_pos==pos)
-                {
-                    if(pos==stringBuffer.length())
-                    {
-                        break;
-                    }
-                    pos++;
-                    continue;
-                }
-
-                if (pos != String::npos)
-                {
-                    // Check definition part
-                    if (stringBuffer[pos] == '=')
-                    {
-                        // Setup null character for macro name
-                        stringBuffer[pos++] = '\0';
-                        macro.Definition = &stringBuffer[pos];
-                        pos = stringBuffer.find_first_of(";,", pos);
-                    }
-                    else
-                    {
-                        // No definition part, define as "1"
-                        macro.Definition = "1";
-                    }
-
-                    if (pos != String::npos)
-                    {
-                        // Setup null character for macro name or definition
-                        stringBuffer[pos++] = '\0';
-                    }
-                }
-                else
-                {
-                    macro.Definition = "1";
-                }
-                if(strlen(macro.Name)>0)
-                {
-                    defines.push_back(macro);
-                }
-                else
-                {
-                    break;
-                }
-            }
+            defines.push_back({def.first, def.second});
         }
 
         //Add D3D11 define to all program, compiled with D3D11 RenderSystem
@@ -274,9 +217,10 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void D3D11HLSLProgram::loadFromSource(void)
     {
-        if ( GpuProgramManager::getSingleton().isMicrocodeAvailableInCache(getNameForMicrocodeCache()) )
+        uint32 hash = getNameForMicrocodeCache();
+        if ( GpuProgramManager::getSingleton().isMicrocodeAvailableInCache(hash) )
         {
-            getMicrocodeFromCache();
+            getMicrocodeFromCache(hash);
         }
         else
         {
@@ -284,10 +228,10 @@ namespace Ogre {
         }
     }
     //-----------------------------------------------------------------------
-    void D3D11HLSLProgram::getMicrocodeFromCache(void)
+    void D3D11HLSLProgram::getMicrocodeFromCache(uint32 id)
     {
         GpuProgramManager::Microcode cacheMicrocode = 
-            GpuProgramManager::getSingleton().getMicrocodeFromCache(getNameForMicrocodeCache());
+            GpuProgramManager::getSingleton().getMicrocodeFromCache(id);
 
         cacheMicrocode->seek(0);
 
@@ -469,7 +413,7 @@ namespace Ogre {
         HLSLIncludeHandler includeHandler(this);
 
         String stringBuffer;
-        vector<D3D_SHADER_MACRO>::type defines;
+        std::vector<D3D_SHADER_MACRO> defines;
         const D3D_SHADER_MACRO* pDefines = NULL;
         if (!shaderMacroSet)
         {
@@ -1255,24 +1199,18 @@ namespace Ogre {
                 currentBuffer = mFloatLogicalToPhysical.get();
                 currentBufferSize = &mConstantDefs->floatBufferSize;
             }
-            else if (def.isInt())
+            else if (def.isInt() || def.isUnsignedInt())
             {
                 currentBuffer = mIntLogicalToPhysical.get();
                 currentBufferSize = &mConstantDefs->intBufferSize;
-            }
-            else if (def.isUnsignedInt())
-            {
-                currentBuffer = mUIntLogicalToPhysical.get();
-                currentBufferSize = &mConstantDefs->uintBufferSize;
             }
 
             if (currentBuffer != NULL && currentBufferSize != NULL)
             {
                 def.physicalIndex = currentBuffer->bufferSize;
                 OGRE_LOCK_MUTEX(currentBuffer->mutex);
-                currentBuffer->map.insert(
-                    GpuLogicalIndexUseMap::value_type(paramIndex,
-                    GpuLogicalIndexUse(def.physicalIndex, def.arraySize * def.elementSize, GPV_GLOBAL)));
+                currentBuffer->map.emplace(
+                    paramIndex, GpuLogicalIndexUse(def.physicalIndex, def.arraySize * def.elementSize, GPV_GLOBAL));
                 currentBuffer->bufferSize += def.arraySize * def.elementSize;
                 *currentBufferSize = currentBuffer->bufferSize;
             }
@@ -1283,7 +1221,7 @@ namespace Ogre {
                             "D3D11HLSLProgram::getConstantBuffer");
             }
 
-            mConstantDefs->map.insert(GpuConstantDefinitionMap::value_type(def.Name, def));
+            mConstantDefs->map.emplace(def.Name, def);
 
             // Now deal with arrays
             mConstantDefs->generateConstantDefinitionArrayEntries(def.Name, def);
@@ -1583,7 +1521,7 @@ namespace Ogre {
     void D3D11HLSLProgram::setTarget(const String& target)
     {
         mTarget = "";
-        vector<String>::type profiles = StringUtil::split(target, " ");
+        std::vector<String> profiles = StringUtil::split(target, " ");
         for(unsigned int i = 0 ; i < profiles.size() ; i++)
         {
             String & currentProfile = profiles[i];
@@ -1947,7 +1885,7 @@ namespace Ogre {
             
             if (it->mUniformBuffer)
             {
-                void* pMappedData = it->mUniformBuffer->lock(HardwareBuffer::HBL_DISCARD);
+                HardwareBufferLockGuard uniformLock(it->mUniformBuffer, HardwareBuffer::HBL_DISCARD);
 
                 // Only iterate through parsed variables (getting size of list)
                 void* src = 0;
@@ -1964,14 +1902,9 @@ namespace Ogre {
                         {
                             src = (void *)&(*(params->getFloatConstantList().begin() + def.physicalIndex));
                         }
-                        else if (def.isInt())
+                        else if (def.isInt() || def.isUnsignedInt())
                         {
                             src = (void *)&(*(params->getIntConstantList().begin() + def.physicalIndex));
-                        }
-
-                        else if (def.isUnsignedInt())
-                        {
-                            src = (void *)&(*(params->getUnsignedIntConstantList().begin() + def.physicalIndex));
                         }
                         else
                         {
@@ -1982,11 +1915,9 @@ namespace Ogre {
                         
 
 
-                        memcpy( &(((char *)(pMappedData))[iter->startOffset]), src , iter->size);
+                        memcpy( &(((char *)(uniformLock.pData))[iter->startOffset]), src , iter->size);
                     }
                 }
-
-                it->mUniformBuffer->unlock();
 
                 return static_cast<D3D11HardwareUniformBuffer*>(it->mUniformBuffer.get())->getD3DConstantBuffer();
             }
@@ -2006,7 +1937,7 @@ namespace Ogre {
         {
             if (it->mUniformBuffer)
             {
-                void* pMappedData = it->mUniformBuffer->lock(HardwareBuffer::HBL_DISCARD);
+                HardwareBufferLockGuard uniformLock(it->mUniformBuffer, HardwareBuffer::HBL_DISCARD);
 
                 // Only iterate through parsed variables (getting size of list)
                 void* src = 0;
@@ -2028,11 +1959,9 @@ namespace Ogre {
                             src = (void *)&(*(params->getIntConstantList().begin() + def.physicalIndex));
                         }
 
-                        memcpy( &(((char *)(pMappedData))[iter->startOffset]), src , iter->size);
+                        memcpy( &(((char *)(uniformLock.pData))[iter->startOffset]), src , iter->size);
                     }
                 }
-
-                it->mUniformBuffer->unlock();
 
                 // Add buffer to list
                 buffers[numBuffers] = static_cast<D3D11HardwareUniformBuffer*>(it->mUniformBuffer.get())->getD3DConstantBuffer();
@@ -2122,9 +2051,10 @@ namespace Ogre {
         return mD3d11ShaderOutputParameters.size();
     }
     //-----------------------------------------------------------------------------
-    String D3D11HLSLProgram::getNameForMicrocodeCache()
+    uint32 D3D11HLSLProgram::getNameForMicrocodeCache()
     {
-        return mName + "_" + mTarget;
+        uint32 seed = FastHash("D3D11", 5); // shaders are identical to D3D9 & Cg
+        return _getHash(seed);
     }
 
 

@@ -33,12 +33,8 @@ THE SOFTWARE
 #include <memory>
 
 namespace Ogre {
-    // Define ogre version
-    #define OGRE_VERSION_MAJOR 1
-    #define OGRE_VERSION_MINOR 11
-    #define OGRE_VERSION_PATCH 0
-    #define OGRE_VERSION_SUFFIX "dev"
-    #define OGRE_VERSION_NAME "Rhagorthua"
+    #define OGRE_TOKEN_PASTE_INNER(x, y) x ## y
+    #define OGRE_TOKEN_PASTE(x, y) OGRE_TOKEN_PASTE_INNER(x, y)
 
     #define OGRE_VERSION    ((OGRE_VERSION_MAJOR << 16) | (OGRE_VERSION_MINOR << 8) | OGRE_VERSION_PATCH)
 
@@ -56,9 +52,13 @@ namespace Ogre {
         typedef float Real;
     #endif
 
+    /// @deprecated
     #define OGRE_HashMap ::std::unordered_map
+    /// @deprecated
     #define OGRE_HashMultiMap ::std::unordered_multimap
+    /// @deprecated
     #define OGRE_HashSet ::std::unordered_set
+    /// @deprecated
     #define OGRE_HashMultiSet ::std::unordered_multiset
 
 
@@ -155,7 +155,6 @@ namespace Ogre {
     class MemoryManager;
     class Mesh;
     class MeshSerializer;
-    class MeshSerializerImpl;
     class MeshManager;
     class MovableObject;
     class MovablePlane;
@@ -215,6 +214,7 @@ namespace Ogre {
     class Root;
     class SceneManager;
     class SceneManagerEnumerator;
+    class SceneLoaderManager;
     class SceneNode;
     class SceneQuery;
     class SceneQueryListener;
@@ -225,7 +225,6 @@ namespace Ogre {
     class ShadowCameraSetup;
     class ShadowCaster;
     class ShadowRenderable;
-    class ShadowTextureManager;
     class SimpleRenderable;
     class SimpleSpline;
     class Skeleton;
@@ -249,9 +248,13 @@ namespace Ogre {
     class TransformKeyFrame;
     class Timer;
     class UserObjectBindings;
-    class Vector2;
-    class Vector3;
-    class Vector4;
+    template <int dims, typename T> class Vector;
+    typedef Vector<2, Real> Vector2;
+    typedef Vector<2, int> Vector2i;
+    typedef Vector<3, Real> Vector3;
+    typedef Vector<3, int> Vector3i;
+    typedef Vector<4, Real> Vector4;
+    typedef Vector<4, float> Vector4f;
     class Viewport;
     class VertexAnimationTrack;
     class VertexBufferBinding;
@@ -281,7 +284,8 @@ namespace Ogre {
     typedef SharedPtr<GpuNamedConstants> GpuNamedConstantsPtr;
     typedef SharedPtr<GpuLogicalBufferStruct> GpuLogicalBufferStructPtr;
     typedef SharedPtr<GpuSharedParameters> GpuSharedParametersPtr;
-    typedef SharedPtr<GpuProgramParameters> GpuProgramParametersSharedPtr;
+    typedef SharedPtr<GpuProgramParameters> GpuProgramParametersPtr;
+    typedef GpuProgramParametersPtr GpuProgramParametersSharedPtr; //!< @deprecated
     typedef SharedPtr<HardwareCounterBuffer> HardwareCounterBufferSharedPtr;
     typedef SharedPtr<HardwareIndexBuffer> HardwareIndexBufferSharedPtr;
     typedef SharedPtr<HardwarePixelBuffer> HardwarePixelBufferSharedPtr;
@@ -320,7 +324,7 @@ namespace Ogre
 namespace Ogre
 {
     template <typename T>
-    struct deque 
+    struct OGRE_DEPRECATED deque
     { 
         typedef typename std::deque<T> type;
         typedef typename std::deque<T>::iterator iterator;
@@ -328,23 +332,18 @@ namespace Ogre
     };
 
     template <typename T>
-    struct vector 
+    struct OGRE_DEPRECATED vector
     { 
         typedef typename std::vector<T> type;
         typedef typename std::vector<T>::iterator iterator;
         typedef typename std::vector<T>::const_iterator const_iterator;
     };
 
-    template <typename T, size_t Alignment>
-    struct aligned_vector 
-    { 
-        typedef typename std::vector<T, AlignedAllocator<T, Alignment> > type;
-        typedef typename std::vector<T, AlignedAllocator<T, Alignment> >::iterator iterator;
-        typedef typename std::vector<T, AlignedAllocator<T, Alignment> >::const_iterator const_iterator;
-    };
+    template <typename T, size_t Alignment = OGRE_SIMD_ALIGNMENT>
+    using aligned_vector = std::vector<T, AlignedAllocator<T, Alignment>>;
 
     template <typename T>
-    struct list 
+    struct OGRE_DEPRECATED list
     { 
         typedef typename std::list<T> type;
         typedef typename std::list<T>::iterator iterator;
@@ -352,7 +351,7 @@ namespace Ogre
     };
 
     template <typename T, typename P = std::less<T> >
-    struct set 
+    struct OGRE_DEPRECATED set
     { 
         typedef typename std::set<T, P> type;
         typedef typename std::set<T, P>::iterator iterator;
@@ -360,7 +359,7 @@ namespace Ogre
     };
 
     template <typename K, typename V, typename P = std::less<K> >
-    struct map 
+    struct OGRE_DEPRECATED map
     { 
         typedef typename std::map<K, V, P> type;
         typedef typename std::map<K, V, P>::iterator iterator;
@@ -368,7 +367,7 @@ namespace Ogre
     };
 
     template <typename K, typename V, typename P = std::less<K> >
-    struct multimap 
+    struct OGRE_DEPRECATED multimap
     { 
         typedef typename std::multimap<K, V, P> type;
         typedef typename std::multimap<K, V, P>::iterator iterator;

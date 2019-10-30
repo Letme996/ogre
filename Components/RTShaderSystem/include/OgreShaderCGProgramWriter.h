@@ -82,10 +82,10 @@ protected:
     void initializeStringMaps();
 
     /** Write the program dependencies. */
-    void writeProgramDependencies(std::ostream& os, Program* program);
+    virtual void writeProgramDependencies(std::ostream& os, Program* program);
     
     /** Write a uniform parameter. */
-    void writeUniformParameter(std::ostream& os, UniformParameterPtr parameter);
+    virtual void writeUniformParameter(std::ostream& os, const UniformParameterPtr& parameter);
 
     /** Write a function parameter. */
     void writeFunctionParameter(std::ostream& os, ParameterPtr parameter);
@@ -101,8 +101,8 @@ protected:
 
 
 protected:
-    typedef map<GpuConstantType, const char*>::type GpuConstTypeToStringMap;
-    typedef map<Parameter::Semantic, const char*>::type ParamSemanticToStringMap;
+    typedef std::map<GpuConstantType, const char*> GpuConstTypeToStringMap;
+    typedef std::map<Parameter::Semantic, const char*> ParamSemanticToStringMap;
 
 // Attributes.
 protected:

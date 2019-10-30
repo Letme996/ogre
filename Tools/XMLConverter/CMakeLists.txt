@@ -21,32 +21,13 @@ set(SOURCE_FILES
   src/OgreXMLSkeletonSerializer.cpp
 )
 
-# If TinyXML is not found on the system use the embedded version.
-if(NOT TINYXML_FOUND)
-  list(APPEND SOURCE_FILES
-    src/tinystr.cpp
-    src/tinyxml.cpp
-    src/tinyxmlerror.cpp
-    src/tinyxmlparser.cpp)
+# allow override by cmake
+find_package(pugixml QUIET)
 
-  list(APPEND HEADER_FILES
-    include/tinystr.h
-    include/tinyxml.h)
-
-  set(TINYXML_INCLUDE_DIR "")
-  set(TINYXML_LIBRARIES "")
-endif(NOT TINYXML_FOUND)
-
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include ${TINYXML_INCLUDE_DIR})
-ogre_add_component_include_dir(MeshLodGenerator)
-add_definitions(-DTIXML_USE_STL)
-
-if(UNIX)
-    add_definitions(-Wno-shadow) # inside tinyxml sources
-endif()
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 add_executable(OgreXMLConverter ${HEADER_FILES} ${SOURCE_FILES})
-target_link_libraries(OgreXMLConverter ${OGRE_LIBRARIES} ${TINYXML_LIBRARIES} ${OGRE_MeshLodGenerator_LIBRARIES})
+target_link_libraries(OgreXMLConverter ${OGRE_LIBRARIES} pugixml ${OGRE_MeshLodGenerator_LIBRARIES})
 
 if (APPLE)
     set_target_properties(OgreXMLConverter PROPERTIES

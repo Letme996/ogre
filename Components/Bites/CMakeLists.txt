@@ -11,8 +11,6 @@
 # Paging optional component
 ############################################################
 
-project(OgreBites)
-
 if(ANDROID)
     include_directories(${ANDROID_NDK}/sources/android/native_app_glue)
 endif()
@@ -22,21 +20,8 @@ if(EMSCRIPTEN)
 endif()
 
 if (OGRE_STATIC)
-  # Static linking means we need to directly use plugins
-  include_directories(${OGRE_SOURCE_DIR}/PlugIns/BSPSceneManager/include)
-  include_directories(${OGRE_SOURCE_DIR}/PlugIns/CgProgramManager/include)
-  include_directories(${OGRE_SOURCE_DIR}/PlugIns/OctreeSceneManager/include)
-  include_directories(${OGRE_SOURCE_DIR}/PlugIns/OctreeZone/include)
-  include_directories(${OGRE_SOURCE_DIR}/PlugIns/ParticleFX/include)
-  include_directories(${OGRE_SOURCE_DIR}/PlugIns/PCZSceneManager/include)
-  include_directories(${OGRE_SOURCE_DIR}/PlugIns/STBICodec/include)
-  include_directories(${OGRE_SOURCE_DIR}/RenderSystems/Direct3D9/include ${DirectX9_INCLUDE_DIR})
-  include_directories(${OGRE_SOURCE_DIR}/RenderSystems/Direct3D11/include)
-  include_directories(${OGRE_SOURCE_DIR}/RenderSystems/GLES/include)
-  include_directories(${OGRE_SOURCE_DIR}/RenderSystems/GLES2/include)
-  include_directories(${OGRE_SOURCE_DIR}/RenderSystems/GLSupport/include)
-  include_directories(${OGRE_SOURCE_DIR}/RenderSystems/GL/include)
-  include_directories(${OGRE_SOURCE_DIR}/RenderSystems/GL3Plus/include)
+  include_directories(${PROJECT_SOURCE_DIR}/RenderSystems/Direct3D9/include ${DirectX9_INCLUDE_DIR})
+  include_directories(${PROJECT_SOURCE_DIR}/RenderSystems/Direct3D11/include)
 
   # Link to all enabled plugins
   if (OGRE_BUILD_PLUGIN_OCTREE)
@@ -53,6 +38,9 @@ if (OGRE_STATIC)
   endif ()
   if (OGRE_BUILD_PLUGIN_PCZ)
     set(DEPENDENCIES ${DEPENDENCIES} Plugin_PCZSceneManager)
+  endif ()
+  if (OGRE_BUILD_PLUGIN_DOT_SCENE)
+    set(DEPENDENCIES ${DEPENDENCIES} Plugin_DotScene)
   endif ()
   if (OGRE_BUILD_PLUGIN_STBI)
     set(DEPENDENCIES ${DEPENDENCIES} Codec_STBI)
@@ -77,23 +65,26 @@ if (OGRE_STATIC)
   endif ()
 endif ()
 
-if (OGRE_BUILD_COMPONENT_RTSHADERSYSTEM)
-  ogre_add_component_include_dir(RTShaderSystem)
-  set(DEPENDENCIES ${DEPENDENCIES} OgreRTShaderSystem)
-endif ()
-
 # define header and source files for the library
 file(GLOB HEADER_FILES "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
-list(APPEND HEADER_FILES ${CMAKE_BINARY_DIR}/include/OgreBitesPrerequisites.h)
+list(APPEND HEADER_FILES
+  ${PROJECT_BINARY_DIR}/include/OgreBitesPrerequisites.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/OgreBites.i)
 set(SOURCES 
   "${CMAKE_CURRENT_SOURCE_DIR}/src/OgreAdvancedRenderControls.cpp"
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/OgreApplicationContext.cpp"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/OgreApplicationContextBase.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/OgreBitesConfigDialog.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/OgreCameraMan.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/OgreSGTechniqueResolverListener.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/OgreStaticPluginLoader.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/OgreTrays.cpp"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/OgreWindowEventUtilities.cpp")
+
+if(SDL2_FOUND OR EMSCRIPTEN)
+  list(APPEND SOURCES  "${CMAKE_CURRENT_SOURCE_DIR}/src/OgreApplicationContextSDL.cpp")
+elseif(ANDROID)
+  list(APPEND SOURCES  "${CMAKE_CURRENT_SOURCE_DIR}/src/OgreApplicationContextAndroid.cpp")
+endif()
 
 if(ANDROID OR EMSCRIPTEN OR APPLE_IOS OR WINDOWS_STORE OR WINDOWS_PHONE)
   # no config dialog available
@@ -121,18 +112,25 @@ elseif(APPLE)
   set(DEPENDENCIES ${DEPENDENCIES} "-framework Cocoa")
 elseif(UNIX)
   list(APPEND SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/OgreGLXConfigDialog.cpp")
-  list(APPEND DEPENDENCIES ${X11_Xt_LIB} ${XAW_LIBRARY})
+  list(APPEND DEPENDENCIES ${X11_X11_LIB} ${X11_Xt_LIB} ${XAW_LIBRARY})
   install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/misc/GLX_backdrop.png" DESTINATION "share/OGRE/")
 endif()
 
-# include headers
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
-ogre_add_component_include_dir(Overlay)
+if(OGRE_BUILD_COMPONENT_OVERLAY_IMGUI)
+  list(APPEND SOURCES
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/OgreImGuiInputListener.cpp")
+endif()
 
 # setup target
 add_library(OgreBites ${OGRE_COMP_LIB_TYPE} ${HEADER_FILES} ${SOURCES})
 set_target_properties(OgreBites PROPERTIES VERSION ${OGRE_SOVERSION} SOVERSION ${OGRE_SOVERSION})
-target_link_libraries(OgreBites OgreMain OgreOverlay ${DEPENDENCIES})
+target_link_libraries(OgreBites PUBLIC OgreMain OgreOverlay PRIVATE ${DEPENDENCIES})
+if (OGRE_BUILD_COMPONENT_RTSHADERSYSTEM)
+  target_link_libraries(OgreBites PUBLIC OgreRTShaderSystem)
+endif ()
+target_include_directories(OgreBites PUBLIC 
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  $<INSTALL_INTERFACE:include/OGRE/Bites>)
 
 if(OGRE_STATIC AND APPLE AND OGRE_BUILD_PLUGIN_CG)
   # workaround so the Cg framework is found in the above condition
@@ -140,13 +138,15 @@ if(OGRE_STATIC AND APPLE AND OGRE_BUILD_PLUGIN_CG)
 endif()
 
 if(SDL2_FOUND)
-  target_include_directories(OgreBites PUBLIC ${SDL2_INCLUDE_DIR})
-  target_link_libraries(OgreBites ${SDL2_LIBRARY})
+  target_include_directories(OgreBites PRIVATE ${SDL2_INCLUDE_DIR})
+  target_link_libraries(OgreBites PRIVATE ${SDL2_LIBRARY})
+elseif(NOT EMSCRIPTEN)
+  message(WARNING "SDL2 not found - no input handling and reduced window creation capabilites")
 endif()
 
 generate_export_header(OgreBites 
     EXPORT_MACRO_NAME _OgreBitesExport
-    EXPORT_FILE_NAME ${CMAKE_BINARY_DIR}/include/OgreBitesPrerequisites.h)
+    EXPORT_FILE_NAME ${PROJECT_BINARY_DIR}/include/OgreBitesPrerequisites.h)
 
 # install 
 ogre_config_framework(OgreBites)
@@ -154,4 +154,7 @@ ogre_config_component(OgreBites)
 
 install(FILES ${HEADER_FILES}
   DESTINATION include/OGRE/Bites
+)
+install(FILES "${PROJECT_SOURCE_DIR}/Media/packs/SdkTrays.zip"
+  DESTINATION "${OGRE_MEDIA_PATH}/packs/"
 )

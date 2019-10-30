@@ -33,6 +33,7 @@ THE SOFTWARE.
 
 #include "OgreCommon.h"
 #include "OgreController.h"
+#include "OgreControllerManager.h"
 #include "OgreIteratorWrappers.h"
 #include "Threading/OgreThreadHeaders.h"
 #include "OgreHeaderPrefix.h"
@@ -56,7 +57,7 @@ namespace Ogre {
     public:
 
         /// Typedef for an array of float values used as a bone blend mask
-        typedef vector<float>::type BoneBlendMask;
+        typedef std::vector<float> BoneBlendMask;
 
         /** Normal constructor with all params supplied
             @param
@@ -183,11 +184,11 @@ namespace Ogre {
     };
 
     // A map of animation states
-    typedef map<String, AnimationState*>::type AnimationStateMap;
+    typedef std::map<String, AnimationState*> AnimationStateMap;
     typedef MapIterator<AnimationStateMap> AnimationStateIterator;
     typedef ConstMapIterator<AnimationStateMap> ConstAnimationStateIterator;
     // A list of enabled animation states
-    typedef list<AnimationState*>::type EnabledAnimationStateList;
+    typedef std::list<AnimationState*> EnabledAnimationStateList;
     typedef ConstVectorIterator<EnabledAnimationStateList> ConstEnabledAnimationStateIterator;
 
     /** Class encapsulating a set of AnimationState objects.
@@ -286,10 +287,21 @@ namespace Ogre {
     {
     protected:
         AnimationState* mTargetAnimationState;
+        bool mAddTime;
     public:
-        /** Constructor, pass in the target animation state. */
-        AnimationStateControllerValue(AnimationState* targetAnimationState)
-            : mTargetAnimationState(targetAnimationState) {}
+        /// @deprecated use create instead
+        AnimationStateControllerValue(AnimationState* targetAnimationState, bool addTime = false)
+            : mTargetAnimationState(targetAnimationState), mAddTime(addTime) {}
+
+        /**
+         * create an instance of this class
+         * @param targetAnimationState
+         * @param addTime if true, increment time instead of setting to an absolute position
+         */
+        static ControllerValueRealPtr create(AnimationState* targetAnimationState, bool addTime = false)
+        {
+            return std::make_shared<AnimationStateControllerValue>(targetAnimationState, addTime);
+        }
 
         /** ControllerValue implementation. */
         Real getValue(void) const
@@ -300,7 +312,10 @@ namespace Ogre {
         /** ControllerValue implementation. */
         void setValue(Real value)
         {
-            mTargetAnimationState->setTimePosition(value * mTargetAnimationState->getLength());
+            if(mAddTime)
+                mTargetAnimationState->addTime(value);
+            else
+                mTargetAnimationState->setTimePosition(value * mTargetAnimationState->getLength());
         }
     };
 

@@ -47,11 +47,12 @@ struct GLUniformReference
     /// The constant definition it relates to
     const GpuConstantDefinition* mConstantDef;
 };
-typedef vector<GLUniformReference>::type GLUniformReferenceList;
+typedef std::vector<GLUniformReference> GLUniformReferenceList;
 typedef GLUniformReferenceList::iterator GLUniformReferenceIterator;
 
-typedef vector<HardwareUniformBufferSharedPtr>::type GLUniformBufferList;
+typedef std::vector<HardwareUniformBufferSharedPtr> GLUniformBufferList;
 typedef GLUniformBufferList::iterator GLUniformBufferIterator;
+typedef std::map<GpuSharedParametersPtr, HardwareUniformBufferSharedPtr> SharedParamsBufferMap;
 
 class GLSLProgramCommon
 {
@@ -93,14 +94,9 @@ public:
     virtual void updateUniforms(GpuProgramParametersSharedPtr params, uint16 mask, GpuProgramType fromProgType) = 0;
 
     /** Updates program object uniform blocks using data from GpuProgramParameters.
-        Normally called by GLSLShader::bindParameters() just before rendering occurs.
+        Normally called by GLRenderSystem::bindParameters() just before rendering occurs.
     */
-    virtual void updateUniformBlocks(GpuProgramParametersSharedPtr params, uint16 mask, GpuProgramType fromProgType) = 0;
-
-    /** Updates program object uniforms using data from pass iteration GpuProgramParameters.
-        Normally called by GLSLShader::bindMultiPassParameters() just before multi pass rendering occurs.
-    */
-    virtual void updatePassIterationUniforms(GpuProgramParametersSharedPtr params) = 0;
+    void updateUniformBlocks();
 
     /** Get the fixed attribute bindings normally used by GL for a semantic. */
     static int32 getFixedAttributeIndex(VertexElementSemantic semantic, uint index);
@@ -114,8 +110,8 @@ public:
 protected:
     /// Container of uniform references that are active in the program object
     GLUniformReferenceList mGLUniformReferences;
-    /// Container of uniform buffer references that are active in the program object
-    GLUniformBufferList mGLUniformBufferReferences;
+    /// Map of shared parameter blocks to uniform buffers
+    SharedParamsBufferMap mSharedParamsBufferMap;
 
     /// Linked vertex shader.
     GLSLShaderCommon* mVertexShader;
@@ -126,8 +122,6 @@ protected:
     uint mGLProgramHandle;
     /// Flag indicating that the program or pipeline object has been successfully linked
     int mLinked;
-    /// Flag indicating that the program or pipeline object has tried to link and failed
-    bool mTriedToLinkAndFailed;
     /// Flag indicating skeletal animation is being performed
     bool mSkeletalAnimation;
     /// A value to define the case we didn't look for the attributes since the contractor

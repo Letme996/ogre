@@ -48,31 +48,22 @@ namespace Ogre {
     /** \addtogroup Resources
     *  @{
     */
-    /** Abstract class representing a loadable resource (e.g. textures, sounds etc)
-        @remarks
-            Resources are data objects that must be loaded and managed throughout
-            an application. A resource might be a mesh, a texture, or any other
-            piece of data - the key thing is that they must be identified by 
-            a name which is unique, must be loaded only once,
-            must be managed efficiently in terms of retrieval, and they may
-            also be unloadable to free memory up when they have not been used for
-            a while and the memory budget is under stress.
-        @par
-            All Resource instances must be a member of a resource group; see
-            ResourceGroupManager for full details.
-        @par
-            Subclasses must implement:
-            <ol>
-            <li>A constructor, overriding the same parameters as the constructor
-                defined by this class. Subclasses are not allowed to define
-                constructors with other parameters; other settings must be
-                settable through accessor methods before loading.</li>
-            <li>The loadImpl() and unloadImpl() methods - mSize must be set 
-                after loadImpl()</li>
-            <li>StringInterface ParamCommand and ParamDictionary setups
-                in order to allow setting of core parameters (prior to load)
-                through a generic interface.</li>
-            </ol>
+    /** Abstract class representing a loadable resource
+
+        @see @ref Resource-Management
+
+        Subclasses must implement:
+        <ol>
+        <li>A constructor, overriding the same parameters as the constructor
+            defined by this class. Subclasses are not allowed to define
+            constructors with other parameters; other settings must be
+            settable through accessor methods before loading.</li>
+        <li>The loadImpl() and unloadImpl() methods - mSize must be set 
+            after loadImpl()</li>
+        <li>StringInterface ParamCommand and ParamDictionary setups
+            in order to allow setting of core parameters (prior to load)
+            through a generic interface.</li>
+        </ol>
     */
     class _OgreExport Resource : public StringInterface, public ResourceAlloc
     {
@@ -164,7 +155,7 @@ namespace Ogre {
         /// State count, the number of times this resource has changed state
         size_t mStateCount;
 
-        typedef set<Listener*>::type ListenerList;
+        typedef std::set<Listener*> ListenerList;
         ListenerList mListenerList;
         OGRE_MUTEX(mListenerListMutex);
 
@@ -222,6 +213,7 @@ namespace Ogre {
         /** Standard constructor.
         @param creator Pointer to the ResourceManager that is creating this resource
         @param name The unique name of the resource
+        @param handle Handle to the resource
         @param group The name of the resource group to which this resource belongs
         @param isManual Is this resource manually loaded? If so, you should really
             populate the loader parameter in order that the load process
@@ -472,13 +464,13 @@ namespace Ogre {
     };
 
     /** Interface describing a manual resource loader.
-    @remarks
+
         Resources are usually loaded from files; however in some cases you
         want to be able to set the data up manually instead. This provides
         some problems, such as how to reload a Resource if it becomes
         unloaded for some reason, either because of memory constraints, or
         because a device fails and some or all of the data is lost.
-    @par
+
         This interface should be implemented by all classes which wish to
         provide manual data to a resource. They provide a pointer to themselves
         when defining the resource (via the appropriate ResourceManager), 
@@ -498,17 +490,18 @@ namespace Ogre {
         ManualResourceLoader() {}
         virtual ~ManualResourceLoader() {}
 
-        /** Called when a resource wishes to load.  Note that this could get
+        /** Called when a resource wishes to prepare instead of Resource::prepareImpl
+         * @note this could get
          * called in a background thread even in just a semithreaded ogre
-         * (OGRE_THREAD_SUPPORT==2).  Thus, you must not access the rendersystem from
-         * this callback.  Do that stuff in loadResource.
-        @param resource The resource which wishes to load
+         * (OGRE_THREAD_SUPPORT==2).  Thus, you must not access the RenderSystem from
+         * this callback.  Do that stuff in #loadResource.
+        @param resource The resource which wishes to prepare
         */
         virtual void prepareResource(Resource* resource)
                 { (void)resource; }
 
-        /** Called when a resource wishes to prepare.
-        @param resource The resource which wishes to prepare
+        /** Called when a resource wishes to load instead of Resource::loadImpl
+        @param resource The resource which wishes to load
         */
         virtual void loadResource(Resource* resource) = 0;
     };

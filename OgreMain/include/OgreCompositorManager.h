@@ -63,10 +63,9 @@ namespace Ogre {
         CompositorManager();
         virtual ~CompositorManager();
 
-        /// Overridden from ResourceManager
         Resource* createImpl(const String& name, ResourceHandle handle,
             const String& group, bool isManual, ManualResourceLoader* loader,
-            const NameValuePairList* params);
+            const NameValuePairList* params) override;
 
         /** Initialises the Compositor manager, which also triggers it to
             parse all available .compositor scripts. */
@@ -97,11 +96,11 @@ namespace Ogre {
 
         /** Returns whether exists compositor chain for a viewport.
         */
-        bool hasCompositorChain(Viewport *vp) const;
+        bool hasCompositorChain(const Viewport *vp) const;
 
         /** Remove the compositor chain from a viewport if exists.
         */
-        void removeCompositorChain(Viewport *vp);
+        void removeCompositorChain(const Viewport *vp);
 
         /** Add a compositor to a viewport. By default, it is added to end of the chain,
             after the other compositors.
@@ -133,7 +132,7 @@ namespace Ogre {
         /** Internal method for forcing all active compositors to recreate their resources. */
         void _reconstructAllCompositorResources();
 
-        typedef set<Texture*>::type UniqueTextureSet;
+        typedef std::set<Texture*> UniqueTextureSet;
 
         /** Utility function to get an existing pooled texture matching a given
             definition, or creating one if one doesn't exist. It also takes into
@@ -143,7 +142,7 @@ namespace Ogre {
             you don't want to get the same texture for both requests!
         */
         TexturePtr getPooledTexture(const String& name, const String& localName, 
-            size_t w, size_t h, 
+            uint32 w, uint32 h,
             PixelFormat f, uint aa, const String& aaHint, bool srgb, UniqueTextureSet& texturesAlreadyAssigned, 
             CompositorInstance* inst, CompositionTechnique::TextureScope scope);
 
@@ -167,22 +166,22 @@ namespace Ogre {
 
 		/** Check if a compositor logic exists
 		*/
-		bool getHasCompositorLogic(const String& name);
+		bool hasCompositorLogic(const String& name);
 		
         /** Register a custom composition pass.
         */
         void registerCustomCompositionPass(const String& name, CustomCompositionPass* customPass);
 
+        void unregisterCustomCompositionPass(const String& name);
+
         /** Get a custom composition pass by its name 
         */
-		void unRegisterCustomCompositionPass(const String& name);
-		
         CustomCompositionPass* getCustomCompositionPass(const String& name);
 
 		/** Check if a compositor pass exists
-		*/		
-		bool getHasCompositionPass(const String& name);
-		
+		*/
+        bool hasCustomCompositionPass(const String& name);
+
         /**
         Relocates a compositor chain from one viewport to another
         @param sourceVP The viewport to take the chain from
@@ -197,7 +196,7 @@ namespace Ogre {
         static CompositorManager* getSingletonPtr(void);
     
     private:
-        typedef map<Viewport*, CompositorChain*>::type Chains;
+        typedef std::map<const Viewport*, CompositorChain*> Chains;
         Chains mChains;
 
         /** Clear composition chains for all viewports
@@ -207,18 +206,18 @@ namespace Ogre {
         Rectangle2D *mRectangle;
 
         /// List of instances
-        typedef vector<CompositorInstance *>::type Instances;
+        typedef std::vector<CompositorInstance *> Instances;
         Instances mInstances;
 
         /// Map of registered compositor logics
-        typedef map<String, CompositorLogic*>::type CompositorLogicMap;
+        typedef std::map<String, CompositorLogic*> CompositorLogicMap;
         CompositorLogicMap mCompositorLogics;
 
         /// Map of registered custom composition passes
-        typedef map<String, CustomCompositionPass*>::type CustomCompositionPassMap;
+        typedef std::map<String, CustomCompositionPass*> CustomCompositionPassMap;
         CustomCompositionPassMap mCustomCompositionPasses;
 
-        typedef vector<TexturePtr>::type TextureList;
+        typedef std::vector<TexturePtr> TextureList;
         typedef VectorIterator<TextureList> TextureIterator;
 
         struct TextureDef
@@ -270,12 +269,12 @@ namespace Ogre {
                 return false;
             }
         };
-        typedef map<TextureDef, TextureList*, TextureDefLess>::type TexturesByDef;
+        typedef std::map<TextureDef, TextureList, TextureDefLess> TexturesByDef;
         TexturesByDef mTexturesByDef;
 
         typedef std::pair<String, String> StringPair;
-        typedef map<TextureDef, TexturePtr, TextureDefLess>::type TextureDefMap;
-        typedef map<StringPair, TextureDefMap>::type ChainTexturesByDef;
+        typedef std::map<TextureDef, TexturePtr, TextureDefLess> TextureDefMap;
+        typedef std::map<StringPair, TextureDefMap> ChainTexturesByDef;
         
         ChainTexturesByDef mChainTexturesByDef;
 

@@ -372,7 +372,7 @@ namespace Ogre
         }
 
         Camera * c = OGRE_NEW PCZCamera( name, this );
-        mCameras.insert( CameraList::value_type( name, c ) );
+        mCameras.emplace(name, c);
 
         // create visible bounds aab map entry
         mCamVisibleObjectsMap[c] = VisibleObjectsBoundsInfo();
@@ -445,9 +445,7 @@ namespace Ogre
         // Clear animations
         destroyAllAnimations();
 
-        // Remove sky nodes since they've been deleted
-        mSkyBoxNode = mSkyPlaneNode = mSkyDomeNode = 0;
-        mSkyBoxEnabled = mSkyPlaneEnabled = mSkyDomeEnabled = false; 
+        mSkyRenderer.clear();
 
         // Clear render queue, empty completely
         if (mRenderQueue)
@@ -491,17 +489,17 @@ namespace Ogre
     /* enable/disable sky rendering */
     void PCZSceneManager::enableSky(bool onoff)
     {
-        if (mSkyBoxNode)
+        if (mSkyRenderer.mSkyBoxNode)
         {
-            mSkyBoxEnabled = onoff;
+            mSkyRenderer.mSkyBoxEnabled = onoff;
         }
-        else if (mSkyDomeNode)
+        else if (mSkyRenderer.mSkyDomeNode)
         {
-            mSkyDomeEnabled = onoff;
+            mSkyRenderer.mSkyDomeEnabled = onoff;
         }
-        else if (mSkyPlaneNode)
+        else if (mSkyRenderer.mSkyPlaneNode)
         {
-            mSkyPlaneEnabled = onoff;
+            mSkyRenderer.mSkyPlaneEnabled = onoff;
         }
     }
 
@@ -513,22 +511,22 @@ namespace Ogre
             // if no zone specified, use default zone
             zone = mDefaultZone;
         }
-        if (mSkyBoxNode)
+        if (mSkyRenderer.mSkyBoxNode)
         {
-            ((PCZSceneNode*)mSkyBoxNode)->setHomeZone(zone);
-            ((PCZSceneNode*)mSkyBoxNode)->anchorToHomeZone(zone);
+            ((PCZSceneNode*)mSkyRenderer.mSkyBoxNode)->setHomeZone(zone);
+            ((PCZSceneNode*)mSkyRenderer.mSkyBoxNode)->anchorToHomeZone(zone);
             zone->setHasSky(true);
         }
-        if (mSkyDomeNode)
+        if (mSkyRenderer.mSkyDomeNode)
         {
-            ((PCZSceneNode*)mSkyDomeNode)->setHomeZone(zone);
-            ((PCZSceneNode*)mSkyDomeNode)->anchorToHomeZone(zone);
+            ((PCZSceneNode*)mSkyRenderer.mSkyDomeNode)->setHomeZone(zone);
+            ((PCZSceneNode*)mSkyRenderer.mSkyDomeNode)->anchorToHomeZone(zone);
             zone->setHasSky(true);
         }
-        if (mSkyPlaneNode)
+        if (mSkyRenderer.mSkyPlaneNode)
         {
-            ((PCZSceneNode*)mSkyPlaneNode)->setHomeZone(zone);
-            ((PCZSceneNode*)mSkyPlaneNode)->anchorToHomeZone(zone);
+            ((PCZSceneNode*)mSkyRenderer.mSkyPlaneNode)->setHomeZone(zone);
+            ((PCZSceneNode*)mSkyRenderer.mSkyPlaneNode)->anchorToHomeZone(zone);
             zone->setHasSky(true);
         }
         
@@ -1079,26 +1077,26 @@ namespace Ogre
     //---------------------------------------------------------------------
     void PCZSceneManager::ensureShadowTexturesCreated()
     {
-        bool shadowTextureConfigDirty = mShadowTextureConfigDirty;
-        SceneManager::ensureShadowTexturesCreated();
+        bool shadowTextureConfigDirty = mShadowRenderer.mShadowTextureConfigDirty;
+        mShadowRenderer.ensureShadowTexturesCreated();
         if (!shadowTextureConfigDirty) return;
 
-        size_t count = mShadowTextureCameras.size();
+        size_t count = mShadowRenderer.mShadowTextureCameras.size();
         for (size_t i = 0; i < count; ++i)
         {
             PCZSceneNode* node = (PCZSceneNode*)mSceneRoot->createChildSceneNode(
-                mShadowTextureCameras[i]->getName());
-            node->attachObject(mShadowTextureCameras[i]);
+                    mShadowRenderer.mShadowTextureCameras[i]->getName());
+            node->attachObject(mShadowRenderer.mShadowTextureCameras[i]);
             addPCZSceneNode(node, mDefaultZone);
         }
     }
     //---------------------------------------------------------------------
     void PCZSceneManager::destroyShadowTextures(void)
     {
-        size_t count = mShadowTextureCameras.size();
+        size_t count = mShadowRenderer.mShadowTextureCameras.size();
         for (size_t i = 0; i < count; ++i)
         {
-            SceneNode* node = mShadowTextureCameras[i]->getParentSceneNode();
+            SceneNode* node = mShadowRenderer.mShadowTextureCameras[i]->getParentSceneNode();
             mSceneRoot->removeAndDestroyChild(node);
         }
         SceneManager::destroyShadowTextures();

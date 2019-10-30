@@ -80,6 +80,7 @@ namespace Ogre {
         mutable Affine3 mViewMatrix;
         mutable Matrix4 mProjectionMatrix;
         mutable Real mDirLightExtrusionDistance;
+        mutable Real mPointLightExtrusionDistance;
         mutable Vector4 mLodCameraPosition;
         mutable Vector4 mLodCameraPositionObjectSpace;
 
@@ -104,7 +105,7 @@ namespace Ogre {
         ColourValue mAmbientLight;
         ColourValue mFogColour;
         Vector4 mFogParams;
-        Vector4 mPointParams;
+        Vector4f mPointParams;
         int mPassNumber;
         mutable Vector4 mSceneDepthRange;
         mutable bool mSceneDepthRangeDirty;
@@ -140,8 +141,10 @@ namespace Ogre {
         void setCurrentRenderTarget(const RenderTarget* target);
         /** Sets the current viewport */
         void setCurrentViewport(const Viewport* viewport);
-        /** Sets the shadow extrusion distance to be used for point lights. */
+        /** Sets the shadow extrusion distance to be used for dir lights. */
         void setShadowDirLightExtrusionDistance(Real dist);
+        /** Sets the shadow extrusion distance to be used for point lights. */
+        void setShadowPointLightExtrusionDistance(Real dist);
         /** Sets the main camera's scene bounding information */
         void setMainCamBoundsInfo(VisibleObjectsBoundsInfo* info);
         /** Set the current scene manager for enquiring on demand */
@@ -167,6 +170,7 @@ namespace Ogre {
         const Matrix4& getInverseTransposeWorldViewMatrix(void) const;
         const Vector4& getCameraPosition(void) const;
         const Vector4& getCameraPositionObjectSpace(void) const;
+        const Vector4  getCameraRelativePosition(void) const;
         const Vector4& getLodCameraPosition(void) const;
         const Vector4& getLodCameraPositionObjectSpace(void) const;
         bool hasLightList() const { return mCurrentLightList != 0; }
@@ -182,7 +186,7 @@ namespace Ogre {
         Vector4 getLightAs4DVector(size_t index) const;
         const Vector3& getLightDirection(size_t index) const;
         Real getLightPowerScale(size_t index) const;
-        Vector4 getLightAttenuation(size_t index) const;
+        const Vector4f& getLightAttenuation(size_t index) const;
         Vector4 getSpotlightParams(size_t index) const;
         void setAmbientLightColour(const ColourValue& ambient);
         const ColourValue& getAmbientLightColour(void) const;
@@ -197,8 +201,7 @@ namespace Ogre {
         void setFog(FogMode mode, const ColourValue& colour, Real expDensity, Real linearStart, Real linearEnd);
         const ColourValue& getFogColour(void) const;
         const Vector4& getFogParams(void) const;
-        void setPointParameters(Real size, bool attenuation, Real constant, Real linear,
-                                Real quadratic);
+        void setPointParameters(bool attenuation, const Vector4f& params);
         const Vector4& getPointParams() const;
         const Matrix4& getTextureViewProjMatrix(size_t index) const;
         const Matrix4& getTextureWorldViewProjMatrix(size_t index) const;

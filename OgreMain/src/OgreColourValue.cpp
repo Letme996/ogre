@@ -165,99 +165,91 @@ namespace Ogre {
     }
     //---------------------------------------------------------------------
 #if OGRE_ENDIAN == OGRE_ENDIAN_BIG
-    void ColourValue::setAsABGR(const ABGR val)
+    void ColourValue::setAsABGR(ABGR val32)
 #else
-    void ColourValue::setAsRGBA(const RGBA val)
+    void ColourValue::setAsRGBA(RGBA val32)
 #endif
     {
-        uint32 val32 = val;
-
         // Convert from 32bit pattern
         // (RGBA = 8888)
 
         // Red
-        r = ((val32 >> 24) & 0xFF) / 255.0f;
+        r = float((val32 >> 24) & 0xFF) / 255.0f;
 
         // Green
-        g = ((val32 >> 16) & 0xFF) / 255.0f;
+        g = float((val32 >> 16) & 0xFF) / 255.0f;
 
         // Blue
-        b = ((val32 >> 8) & 0xFF) / 255.0f;
+        b = float((val32 >> 8) & 0xFF) / 255.0f;
 
         // Alpha
-        a = (val32 & 0xFF) / 255.0f;
+        a = float(val32 & 0xFF) / 255.0f;
     }
     //---------------------------------------------------------------------
 #if OGRE_ENDIAN == OGRE_ENDIAN_BIG
-    void ColourValue::setAsBGRA(const BGRA val)
+    void ColourValue::setAsBGRA(BGRA val32)
 #else
-    void ColourValue::setAsARGB(const ARGB val)
+    void ColourValue::setAsARGB(ARGB val32)
 #endif
     {
-        uint32 val32 = val;
-
         // Convert from 32bit pattern
         // (ARGB = 8888)
 
         // Alpha
-        a = ((val32 >> 24) & 0xFF) / 255.0f;
+        a = float((val32 >> 24) & 0xFF) / 255.0f;
 
         // Red
-        r = ((val32 >> 16) & 0xFF) / 255.0f;
+        r = float((val32 >> 16) & 0xFF) / 255.0f;
 
         // Green
-        g = ((val32 >> 8) & 0xFF) / 255.0f;
+        g = float((val32 >> 8) & 0xFF) / 255.0f;
 
         // Blue
-        b = (val32 & 0xFF) / 255.0f;
+        b = float(val32 & 0xFF) / 255.0f;
     }
     //---------------------------------------------------------------------
 #if OGRE_ENDIAN == OGRE_ENDIAN_BIG
-    void ColourValue::setAsARGB(const ARGB val)
+    void ColourValue::setAsARGB(ARGB val32)
 #else
-    void ColourValue::setAsBGRA(const BGRA val)
+    void ColourValue::setAsBGRA(BGRA val32)
 #endif
     {
-        uint32 val32 = val;
-
         // Convert from 32bit pattern
         // (ARGB = 8888)
 
         // Blue
-        b = ((val32 >> 24) & 0xFF) / 255.0f;
+        b = float((val32 >> 24) & 0xFF) / 255.0f;
 
         // Green
-        g = ((val32 >> 16) & 0xFF) / 255.0f;
+        g = float((val32 >> 16) & 0xFF) / 255.0f;
 
         // Red
-        r = ((val32 >> 8) & 0xFF) / 255.0f;
+        r = float((val32 >> 8) & 0xFF) / 255.0f;
 
         // Alpha
-        a = (val32 & 0xFF) / 255.0f;
+        a = float(val32 & 0xFF) / 255.0f;
     }
     //---------------------------------------------------------------------
 #if OGRE_ENDIAN == OGRE_ENDIAN_BIG
-    void ColourValue::setAsRGBA(const RGBA val)
+    void ColourValue::setAsRGBA(RGBA val32)
 #else
-    void ColourValue::setAsABGR(const ABGR val)
+    void ColourValue::setAsABGR(ABGR val32)
 #endif
     {
-        uint32 val32 = val;
-
         // Convert from 32bit pattern
         // (ABGR = 8888)
 
         // Alpha
-        a = ((val32 >> 24) & 0xFF) / 255.0f;
+        a = float((val32 >> 24) & 0xFF) / 255.0f;
 
         // Blue
-        b = ((val32 >> 16) & 0xFF) / 255.0f;
+        b = float((val32 >> 16) & 0xFF) / 255.0f;
 
         // Green
-        g = ((val32 >> 8) & 0xFF) / 255.0f;
+        g = float((val32 >> 8) & 0xFF) / 255.0f;
 
         // Red
-        r = (val32 & 0xFF) / 255.0f;
+        r = float(val32 & 0xFF) / 255.0f;
     }
     //---------------------------------------------------------------------
     bool ColourValue::operator==(const ColourValue& rhs) const
@@ -273,22 +265,14 @@ namespace Ogre {
         return !(*this == rhs);
     }
     //---------------------------------------------------------------------
-    void ColourValue::setHSB(Real hue, Real saturation, Real brightness)
+    void ColourValue::setHSB(float hue, float saturation, float brightness)
     {
         // wrap hue
-        if (hue > 1.0f)
-        {
-            hue -= (int)hue;
-        }
-        else if (hue < 0.0f)
-        {
-            hue += (int)hue + 1;
-        }
+        hue = std::fmod(hue, 1.0f);
+
         // clamp saturation / brightness
-        saturation = std::min(saturation, (Real)1.0);
-        saturation = std::max(saturation, (Real)0.0);
-        brightness = std::min(brightness, (Real)1.0);
-        brightness = std::max(brightness, (Real)0.0);
+        saturation = Math::saturate(saturation);
+        brightness = Math::saturate(brightness);
 
         if (brightness == 0.0f)
         {   
@@ -306,16 +290,16 @@ namespace Ogre {
         }
 
 
-        Real hueDomain  = hue * 6.0f;
+        float hueDomain  = hue * 6.0f;
         if (hueDomain >= 6.0f)
         {
             // wrap around, and allow mathematical errors
             hueDomain = 0.0f;
         }
         unsigned short domain = (unsigned short)hueDomain;
-        Real f1 = brightness * (1 - saturation);
-        Real f2 = brightness * (1 - saturation * (hueDomain - domain));
-        Real f3 = brightness * (1 - saturation * (1 - (hueDomain - domain)));
+        float f1 = brightness * (1 - saturation);
+        float f2 = brightness * (1 - saturation * (hueDomain - domain));
+        float f3 = brightness * (1 - saturation * (1 - (hueDomain - domain)));
 
         switch (domain)
         {
@@ -360,41 +344,41 @@ namespace Ogre {
 
     }
     //---------------------------------------------------------------------
-    void ColourValue::getHSB(Real* hue, Real* saturation, Real* brightness) const
+    void ColourValue::getHSB(float& hue, float& saturation, float& brightness) const
     {
 
-        Real vMin = std::min(r, std::min(g, b));
-        Real vMax = std::max(r, std::max(g, b));
-        Real delta = vMax - vMin;
+        float vMin = std::min(r, std::min(g, b));
+        float vMax = std::max(r, std::max(g, b));
+        float delta = vMax - vMin;
 
-        *brightness = vMax;
+        brightness = vMax;
 
-        if (Math::RealEqual(delta, 0.0f, 1e-6))
+        if (Math::RealEqual(delta, 0.0f, 1e-6f))
         {
             // grey
-            *hue = 0;
-            *saturation = 0;
+            hue = 0;
+            saturation = 0;
         }
         else                                    
         {
             // a colour
-            *saturation = delta / vMax;
+            saturation = delta / vMax;
 
-            Real deltaR = (((vMax - r) / 6.0f) + (delta / 2.0f)) / delta;
-            Real deltaG = (((vMax - g) / 6.0f) + (delta / 2.0f)) / delta;
-            Real deltaB = (((vMax - b) / 6.0f) + (delta / 2.0f)) / delta;
+            float deltaR = (((vMax - r) / 6.0f) + (delta / 2.0f)) / delta;
+            float deltaG = (((vMax - g) / 6.0f) + (delta / 2.0f)) / delta;
+            float deltaB = (((vMax - b) / 6.0f) + (delta / 2.0f)) / delta;
 
             if (Math::RealEqual(r, vMax))
-                *hue = deltaB - deltaG;
+                hue = deltaB - deltaG;
             else if (Math::RealEqual(g, vMax))
-                *hue = 0.3333333f + deltaR - deltaB;
+                hue = 0.3333333f + deltaR - deltaB;
             else if (Math::RealEqual(b, vMax)) 
-                *hue = 0.6666667f + deltaG - deltaR;
+                hue = 0.6666667f + deltaG - deltaR;
 
-            if (*hue < 0.0f) 
-                *hue += 1.0f;
-            if (*hue > 1.0f)
-                *hue -= 1.0f;
+            if (hue < 0.0f)
+                hue += 1.0f;
+            if (hue > 1.0f)
+                hue -= 1.0f;
         }
 
         

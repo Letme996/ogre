@@ -42,7 +42,7 @@ namespace Ogre {
     */
 
     /// Define a list of usage flags
-    typedef vector<HardwareBuffer::Usage>::type BufferUsageList;
+    typedef std::vector<HardwareBuffer::Usage> BufferUsageList;
 
 
     /** Summary class collecting together vertex source information. */
@@ -96,7 +96,7 @@ namespace Ogre {
             unsigned short targetBufferIndex;
             Real parametric;
         };
-        typedef vector<HardwareAnimationData>::type HardwareAnimationDataList;
+        typedef std::vector<HardwareAnimationData> HardwareAnimationDataList;
         /// VertexElements used for hardware morph / pose animation
         HardwareAnimationDataList hwAnimationDataList;
         /// Number of hardware animation data items used
@@ -107,7 +107,7 @@ namespace Ogre {
         @param mgr If supplied, the buffer manager through which copies should be made
         @remarks The caller is expected to delete the returned pointer when ready
         */
-        VertexData* clone(bool copyData = true, HardwareBufferManagerBase* mgr = 0) const;
+        VertexData* clone(bool copyData = true, HardwareBufferManagerBase* mgr = 0) const OGRE_NODISCARD;
 
         /** Modifies the vertex data to be suitable for use for rendering shadow geometry.
         @remarks

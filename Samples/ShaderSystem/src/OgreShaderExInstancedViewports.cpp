@@ -87,27 +87,24 @@ bool ShaderExInstancedViewports::preAddToRenderState( const RenderState* renderS
 //-----------------------------------------------------------------------
 bool ShaderExInstancedViewports::resolveParameters(ProgramSet* programSet)
 {
-    Program* vsProgram = programSet->getCpuVertexProgram();
-    Program* psProgram = programSet->getCpuFragmentProgram();
+    Program* vsProgram = programSet->getCpuProgram(GPT_VERTEX_PROGRAM);
+    Program* psProgram = programSet->getCpuProgram(GPT_FRAGMENT_PROGRAM);
     Function* vsMain = vsProgram->getEntryPointFunction();
     Function* psMain = psProgram->getEntryPointFunction();
 
 
     // Resolve vertex shader output position in projective space.
 
-    mVSInPosition = vsMain->resolveInputParameter(Parameter::SPS_POSITION, 0, Parameter::SPC_POSITION_OBJECT_SPACE, GCT_FLOAT4);
+    mVSInPosition = vsMain->resolveInputParameter(Parameter::SPC_POSITION_OBJECT_SPACE);
 
-    mVSOriginalOutPositionProjectiveSpace = vsMain->resolveOutputParameter(Parameter::SPS_POSITION, 0, Parameter::SPC_POSITION_PROJECTIVE_SPACE, GCT_FLOAT4);
+    mVSOriginalOutPositionProjectiveSpace = vsMain->resolveOutputParameter(Parameter::SPC_POSITION_PROJECTIVE_SPACE);
 
 #define SPC_POSITION_PROJECTIVE_SPACE_AS_TEXCORD ((Parameter::Content)(Parameter::SPC_CUSTOM_CONTENT_BEGIN + 1))
 
-    mVSOutPositionProjectiveSpace = vsMain->resolveOutputParameter(Parameter::SPS_TEXTURE_COORDINATES, -1, SPC_POSITION_PROJECTIVE_SPACE_AS_TEXCORD, GCT_FLOAT4);
+    mVSOutPositionProjectiveSpace = vsMain->resolveOutputParameter(SPC_POSITION_PROJECTIVE_SPACE_AS_TEXCORD, GCT_FLOAT4);
 
     // Resolve ps input position in projective space.
-    mPSInPositionProjectiveSpace = psMain->resolveInputParameter(Parameter::SPS_TEXTURE_COORDINATES, 
-        mVSOutPositionProjectiveSpace->getIndex(), 
-        mVSOutPositionProjectiveSpace->getContent(),
-        GCT_FLOAT4);
+    mPSInPositionProjectiveSpace = psMain->resolveInputParameter(mVSOutPositionProjectiveSpace);
     // Resolve vertex shader uniform monitors count
     mVSInMonitorsCount = vsProgram->resolveParameter(GCT_FLOAT2, -1, (uint16)GPV_GLOBAL, "monitorsCount");
 
@@ -116,15 +113,15 @@ bool ShaderExInstancedViewports::resolveParameters(ProgramSet* programSet)
 
 
     // Resolve the current world & view matrices concatenated   
-    mWorldViewMatrix = vsProgram->resolveAutoParameterInt(GpuProgramParameters::ACT_WORLDVIEW_MATRIX, 0);
+    mWorldViewMatrix = vsProgram->resolveParameter(GpuProgramParameters::ACT_WORLDVIEW_MATRIX);
 
     // Resolve the current projection matrix
-    mProjectionMatrix = vsProgram->resolveAutoParameterInt(GpuProgramParameters::ACT_PROJECTION_MATRIX, 0);
+    mProjectionMatrix = vsProgram->resolveParameter(GpuProgramParameters::ACT_PROJECTION_MATRIX);
     
     
 #define SPC_MONITOR_INDEX Parameter::SPC_TEXTURE_COORDINATE3
     // Resolve vertex shader  monitor index
-    mVSInMonitorIndex = vsMain->resolveInputParameter(Parameter::SPS_TEXTURE_COORDINATES, 3, SPC_MONITOR_INDEX, GCT_FLOAT4);
+    mVSInMonitorIndex = vsMain->resolveInputParameter(SPC_MONITOR_INDEX, GCT_FLOAT4);
 
 #define SPC_MATRIX_R0 Parameter::SPC_TEXTURE_COORDINATE4
 #define SPC_MATRIX_R1 Parameter::SPC_TEXTURE_COORDINATE5
@@ -132,50 +129,34 @@ bool ShaderExInstancedViewports::resolveParameters(ProgramSet* programSet)
 #define SPC_MATRIX_R3 Parameter::SPC_TEXTURE_COORDINATE7
 
     // Resolve vertex shader viewport offset matrix
-    mVSInViewportOffsetMatrixR0 = vsMain->resolveInputParameter(Parameter::SPS_TEXTURE_COORDINATES, 4, SPC_MATRIX_R0, GCT_FLOAT4);
-    mVSInViewportOffsetMatrixR1 = vsMain->resolveInputParameter(Parameter::SPS_TEXTURE_COORDINATES, 5, SPC_MATRIX_R1, GCT_FLOAT4);
-    mVSInViewportOffsetMatrixR2 = vsMain->resolveInputParameter(Parameter::SPS_TEXTURE_COORDINATES, 6, SPC_MATRIX_R2, GCT_FLOAT4);
-    mVSInViewportOffsetMatrixR3 = vsMain->resolveInputParameter(Parameter::SPS_TEXTURE_COORDINATES, 7, SPC_MATRIX_R3, GCT_FLOAT4);
+    mVSInViewportOffsetMatrixR0 = vsMain->resolveInputParameter(SPC_MATRIX_R0, GCT_FLOAT4);
+    mVSInViewportOffsetMatrixR1 = vsMain->resolveInputParameter(SPC_MATRIX_R1, GCT_FLOAT4);
+    mVSInViewportOffsetMatrixR2 = vsMain->resolveInputParameter(SPC_MATRIX_R2, GCT_FLOAT4);
+    mVSInViewportOffsetMatrixR3 = vsMain->resolveInputParameter(SPC_MATRIX_R3, GCT_FLOAT4);
 
 
     
-    // Resolve vertex shader output monitor index.  
-    mVSOutMonitorIndex = vsMain->resolveOutputParameter(Parameter::SPS_TEXTURE_COORDINATES, -1, 
-            SPC_MONITOR_INDEX,
-            GCT_FLOAT4);
-    
+    // Resolve vertex shader output monitor index.
+    mVSOutMonitorIndex = vsMain->resolveOutputParameter(SPC_MONITOR_INDEX, GCT_FLOAT4);
+
     // Resolve ps input monitor index.
-    mPSInMonitorIndex = psMain->resolveInputParameter(Parameter::SPS_TEXTURE_COORDINATES, 
-        mVSOutMonitorIndex->getIndex(), 
-        mVSOutMonitorIndex->getContent(),
-        GCT_FLOAT4);
+    mPSInMonitorIndex = psMain->resolveInputParameter(mVSOutMonitorIndex);
 
-    if (!mVSInPosition.get() || !mWorldViewMatrix.get() || !mVSOriginalOutPositionProjectiveSpace.get() ||
-        !mVSOutPositionProjectiveSpace.get() || !mPSInPositionProjectiveSpace.get() || !mVSInMonitorsCount.get() ||
-        !mPSInMonitorsCount.get() || !mVSInMonitorIndex.get() || !mProjectionMatrix.get() || !mVSInViewportOffsetMatrixR0.get() ||
-        !mVSInViewportOffsetMatrixR1.get() || !mVSInViewportOffsetMatrixR2.get() || !mVSInViewportOffsetMatrixR3.get() ||
-        !mVSOutMonitorIndex.get() || !mPSInMonitorIndex.get())
-    {
-        OGRE_EXCEPT( Exception::ERR_INTERNAL_ERROR, 
-                    "Not all parameters could be constructed for the sub-render state.",
-                    "ShaderExInstancedViewports::resolveParameters" );
-    }
-            
-    
     return true;
 }
 
 //-----------------------------------------------------------------------
 bool ShaderExInstancedViewports::resolveDependencies(ProgramSet* programSet)
 {
-    Program* vsProgram = programSet->getCpuVertexProgram();
-    Program* psProgram = programSet->getCpuFragmentProgram();
+    Program* vsProgram = programSet->getCpuProgram(GPT_VERTEX_PROGRAM);
+    Program* psProgram = programSet->getCpuProgram(GPT_FRAGMENT_PROGRAM);
 
     vsProgram->addDependency(FFP_LIB_COMMON);
     vsProgram->addDependency(SGX_LIB_INSTANCED_VIEWPORTS);
     
     psProgram->addDependency(FFP_LIB_COMMON);
     psProgram->addDependency(SGX_LIB_INSTANCED_VIEWPORTS);
+    psProgram->addPreprocessorDefines("FRAGMENT_PROG"); // needed for GLSL
     
     return true;
 }
@@ -184,9 +165,9 @@ bool ShaderExInstancedViewports::resolveDependencies(ProgramSet* programSet)
 //-----------------------------------------------------------------------
 bool ShaderExInstancedViewports::addFunctionInvocations(ProgramSet* programSet)
 {
-    Program* vsProgram = programSet->getCpuVertexProgram(); 
+    Program* vsProgram = programSet->getCpuProgram(GPT_VERTEX_PROGRAM); 
     Function* vsMain = vsProgram->getEntryPointFunction();  
-    Program* psProgram = programSet->getCpuFragmentProgram();
+    Program* psProgram = programSet->getCpuProgram(GPT_FRAGMENT_PROGRAM);
     Function* psMain = psProgram->getEntryPointFunction();  
     
 
@@ -205,7 +186,7 @@ bool ShaderExInstancedViewports::addFunctionInvocations(ProgramSet* programSet)
 //-----------------------------------------------------------------------
 bool ShaderExInstancedViewports::addVSInvocations( Function* vsMain, const int groupOrder )
 {
-    FunctionInvocation* funcInvocation = NULL;
+    FunctionAtom* funcInvocation = NULL;
     
     funcInvocation = OGRE_NEW FunctionInvocation(SGX_FUNC_INSTANCED_VIEWPORTS_TRANSFORM, groupOrder);
     funcInvocation->pushOperand(mVSInPosition, Operand::OPS_IN);
@@ -250,7 +231,7 @@ bool ShaderExInstancedViewports::addPSInvocations( Function* psMain, const int g
     return true;
 }
 //-----------------------------------------------------------------------
-void ShaderExInstancedViewports::updateGpuProgramsParams(Renderable* rend, Pass* pass, const AutoParamDataSource* source, const LightList* pLightList)
+void ShaderExInstancedViewports::updateGpuProgramsParams(Renderable* rend, const Pass* pass, const AutoParamDataSource* source, const LightList* pLightList)
 {
     if (mMonitorsCountChanged)
     {

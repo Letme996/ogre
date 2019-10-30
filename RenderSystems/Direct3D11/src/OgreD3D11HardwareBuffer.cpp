@@ -97,8 +97,8 @@ namespace Ogre {
         // Create shadow buffer
         if (mUseShadowBuffer)
         {
-            mShadowBuffer = new D3D11HardwareBuffer(mBufferType, 
-                    mSizeInBytes, mUsage, mDevice, true, false, false);
+            mShadowBuffer.reset(new D3D11HardwareBuffer(mBufferType,
+                    mSizeInBytes, mUsage, mDevice, true, false, false));
         }
 
     }
@@ -106,7 +106,7 @@ namespace Ogre {
     D3D11HardwareBuffer::~D3D11HardwareBuffer()
     {
         SAFE_DELETE(mpTempStagingBuffer); // should never be nonzero unless destroyed while locked
-        SAFE_DELETE(mShadowBuffer);
+        mShadowBuffer.reset();
     }
     //---------------------------------------------------------------------
     void* D3D11HardwareBuffer::lockImpl(size_t offset, 
@@ -232,7 +232,7 @@ namespace Ogre {
     {
 		if (mUseShadowBuffer)
 		{
-			static_cast<D3D11HardwareBuffer*>(mShadowBuffer)->copyDataImpl(srcBuffer, srcOffset, dstOffset, length, discardWholeBuffer);
+			static_cast<D3D11HardwareBuffer*>(mShadowBuffer.get())->copyDataImpl(srcBuffer, srcOffset, dstOffset, length, discardWholeBuffer);
 		}
 		copyDataImpl(srcBuffer, srcOffset, dstOffset, length, discardWholeBuffer);
 	}
@@ -282,7 +282,7 @@ namespace Ogre {
 		if(mUseShadowBuffer && mShadowUpdated && !mSuppressHardwareUpdate)
 		{
 			bool discardWholeBuffer = mLockStart == 0 && mLockSize == mSizeInBytes;
-			copyDataImpl(*static_cast<D3D11HardwareBuffer*>(mShadowBuffer), mLockStart, mLockStart, mLockSize, discardWholeBuffer);
+			copyDataImpl(*mShadowBuffer, mLockStart, mLockStart, mLockSize, discardWholeBuffer);
 			mShadowUpdated = false;
         }
     }
@@ -292,10 +292,8 @@ namespace Ogre {
     {
         // There is no functional interface in D3D, just do via manual 
         // lock, copy & unlock
-        void* pSrc = this->lock(offset, length, HardwareBuffer::HBL_READ_ONLY);
-        memcpy(pDest, pSrc, length);
-        this->unlock();
-
+        HardwareBufferLockGuard thisLock(this, offset, length, HardwareBuffer::HBL_READ_ONLY);
+        memcpy(pDest, thisLock.pData, length);
     }
     //---------------------------------------------------------------------
     void D3D11HardwareBuffer::writeData(size_t offset, size_t length, 
@@ -304,10 +302,9 @@ namespace Ogre {
     {
         // There is no functional interface in D3D, just do via manual 
         // lock, copy & unlock
-        void* pDst = this->lock(offset, length, 
+        HardwareBufferLockGuard thisLock(this, offset, length,
             discardWholeBuffer ? HardwareBuffer::HBL_DISCARD : HardwareBuffer::HBL_NORMAL);
-        memcpy(pDst, pSource, length);
-        this->unlock();
+        memcpy(thisLock.pData, pSource, length);
 
         //What if we try UpdateSubresource
         //mDevice.GetImmediateContext()->UpdateSubresource(mlpD3DBuffer.Get(), 0, NULL, pSource, offset, length);

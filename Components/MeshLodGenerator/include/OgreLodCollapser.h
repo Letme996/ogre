@@ -74,10 +74,10 @@ protected:
     struct CollapsedEdge {
         unsigned int srcID;
         unsigned int dstID;
-        size_t submeshID;
+        unsigned short submeshID;
     };
     
-    typedef vector<CollapsedEdge>::type CollapsedEdges;
+    typedef std::vector<CollapsedEdge> CollapsedEdges;
 
     /// tmp variable, to overcome allocation on every collapse.
     CollapsedEdges tmpCollapsedEdges;

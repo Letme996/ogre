@@ -76,8 +76,7 @@ namespace Ogre
     //---------------------------------------------------------------------
     void PropertySet::addProperty(PropertyBase* prop)
     {
-        std::pair<PropertyMap::iterator, bool> retPair = 
-            mPropertyMap.insert(PropertyMap::value_type(prop->getName(), prop));
+        std::pair<PropertyMap::iterator, bool> retPair = mPropertyMap.emplace(prop->getName(), prop);
         if (!retPair.second)
             OGRE_EXCEPT(Exception::ERR_DUPLICATE_ITEM, "Duplicate property entry!", 
                 "PropertySet::addProperty");
@@ -102,11 +101,6 @@ namespace Ogre
     void PropertySet::removeProperty(const String& name)
     {
         mPropertyMap.erase(name);
-    }
-    //---------------------------------------------------------------------
-    PropertySet::PropertyIterator PropertySet::getPropertyIterator()
-    {
-        return PropertyIterator(mPropertyMap.begin(), mPropertyMap.end());
     }
     //---------------------------------------------------------------------
     PropertyValueMap PropertySet::getValueMap() const

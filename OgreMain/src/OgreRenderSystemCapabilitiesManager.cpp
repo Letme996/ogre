@@ -83,7 +83,7 @@ namespace Ogre {
         return mCapabilitiesMap[name];
     }
 
-    const map<String, RenderSystemCapabilities*>::type &RenderSystemCapabilitiesManager::getCapabilities() const
+    const std::map<String, RenderSystemCapabilities*> &RenderSystemCapabilitiesManager::getCapabilities() const
     {
         return mCapabilitiesMap;
     }
@@ -91,7 +91,7 @@ namespace Ogre {
     /** Method used by RenderSystemCapabilitiesSerializer::parseScript */
     void RenderSystemCapabilitiesManager::_addRenderSystemCapabilities(const String& name, RenderSystemCapabilities* caps)
     {
-        mCapabilitiesMap.insert(CapabilitiesMap::value_type(name, caps));
+        mCapabilitiesMap.emplace(name, caps);
     }
 }
 

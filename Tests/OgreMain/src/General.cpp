@@ -34,15 +34,36 @@ THE SOFTWARE.
 #include "RootWithoutRenderSystemFixture.h"
 #include "OgreStaticPluginLoader.h"
 
-#if __cplusplus >= 201103L || (defined(_MSC_VER) && _MSC_VER >= 1600)
+#include "OgreMaterialSerializer.h"
+#include "OgreTechnique.h"
+#include "OgrePass.h"
+#include "OgreMaterialManager.h"
+#include "OgreConfigFile.h"
+#include "OgreSTBICodec.h"
+#include "OgreHighLevelGpuProgramManager.h"
+#include "OgreMeshManager.h"
+#include "OgreMesh.h"
+#include "OgreSkeletonManager.h"
+#include "OgreCompositorManager.h"
+#include "OgreTextureManager.h"
+
 #include <random>
 using std::minstd_rand;
-#else
-#include <tr1/random>
-using std::tr1::minstd_rand;
-#endif
 
 using namespace Ogre;
+
+typedef RootWithoutRenderSystemFixture CameraTests;
+TEST_F(CameraTests,customProjectionMatrix)
+{
+    Camera cam("", NULL);
+    std::vector<Vector3> corners(cam.getWorldSpaceCorners(), cam.getWorldSpaceCorners() + 8);
+    RealRect extents = cam.getFrustumExtents();
+    cam.setCustomProjectionMatrix(true, cam.getProjectionMatrix());
+    for(int j = 0; j < 8; j++)
+        EXPECT_EQ(corners[j], cam.getWorldSpaceCorners()[j]);
+
+    EXPECT_EQ(extents, cam.getFrustumExtents());
+}
 
 TEST(Root,shutdown)
 {
@@ -154,4 +175,117 @@ TEST_F(SceneQueryTest, Ray) {
 
     ASSERT_EQ("501", results[0].movable->getName());
     ASSERT_EQ("397", results[1].movable->getName());
+}
+
+TEST(MaterialSerializer, Basic)
+{
+    Root root;
+    DefaultTextureManager texMgr;
+
+    String group = "General";
+
+    auto mat = std::make_shared<Material>(nullptr, "Material Name", 0, group);
+    auto pass = mat->createTechnique()->createPass();
+    auto tus = pass->createTextureUnitState();
+    tus->setContentType(TextureUnitState::CONTENT_SHADOW);
+    tus->setName("Test TUS");
+    pass->setAmbient(ColourValue::Green);
+
+    pass->createTextureUnitState("TextureName");
+
+    // export to string
+    MaterialSerializer ser;
+    ser.queueForExport(mat);
+    auto str = ser.getQueuedAsString();
+
+    // printf("%s\n", str.c_str());
+
+    // load again
+    DataStreamPtr stream = std::make_shared<MemoryDataStream>("memory.material", &str[0], str.size());
+    MaterialManager::getSingleton().parseScript(stream, group);
+
+    auto mat2 = MaterialManager::getSingleton().getByName("Material Name", group);
+    ASSERT_TRUE(mat2);
+    EXPECT_EQ(mat2->getTechniques().size(), mat->getTechniques().size());
+    EXPECT_EQ(mat2->getTechniques()[0]->getPasses()[0]->getAmbient(), ColourValue::Green);
+    EXPECT_EQ(mat2->getTechniques()[0]->getPasses()[0]->getTextureUnitState("Test TUS")->getContentType(),
+              TextureUnitState::CONTENT_SHADOW);
+    EXPECT_EQ(mat2->getTechniques()[0]->getPasses()[0]->getTextureUnitState("Test TUS")->getTextureNameAlias(),
+              "Test TUS");
+    EXPECT_EQ(mat2->getTechniques()[0]->getPasses()[0]->getTextureUnitState(1)->getTextureName(),
+              "TextureName");
+}
+
+TEST(Image, FlipV)
+{
+    ResourceGroupManager mgr;
+    STBIImageCodec::startup();
+    ConfigFile cf;
+    cf.load(FileSystemLayer(OGRE_VERSION_NAME).getConfigFilePath("resources.cfg"));
+    auto testPath = cf.getSettings("Tests").begin()->second;
+
+    Image ref;
+    ref.load(Root::openFileStream(testPath+"/decal1vflip.png"), "png");
+
+    Image img;
+    img.load(Root::openFileStream(testPath+"/decal1.png"), "png");
+    img.flipAroundX();
+
+    // img.save(testPath+"/decal1vflip.png");
+
+    ASSERT_TRUE(!memcmp(img.getData(), ref.getData(), ref.getSize()));
+
+    STBIImageCodec::shutdown();
+}
+
+struct TestResourceLoadingListener : public ResourceLoadingListener
+{
+    DataStreamPtr resourceLoading(const String &name, const String &group, Resource *resource) { return DataStreamPtr(); }
+    void resourceStreamOpened(const String &name, const String &group, Resource *resource, DataStreamPtr& dataStream) {}
+    bool resourceCollision(Resource *resource, ResourceManager *resourceManager) { return false; }
+};
+
+typedef RootWithoutRenderSystemFixture ResourceLoading;
+TEST_F(ResourceLoading, CollsionUseExisting)
+{
+    TestResourceLoadingListener listener;
+    ResourceGroupManager::getSingleton().setLoadingListener(&listener);
+
+    MaterialPtr mat = MaterialManager::getSingleton().create("Collision", "Tests");
+    EXPECT_TRUE(mat);
+    EXPECT_FALSE(MaterialManager::getSingleton().create("Collision", "Tests"));
+    EXPECT_FALSE(mat->clone("Collision"));
+
+    MeshPtr mesh = MeshManager::getSingleton().create("Collision", "Tests");
+    EXPECT_TRUE(mesh);
+    EXPECT_FALSE(MeshManager::getSingleton().create("Collision", "Tests"));
+    EXPECT_FALSE(mesh->clone("Collision"));
+
+    EXPECT_TRUE(SkeletonManager::getSingleton().create("Collision", "Tests"));
+    EXPECT_FALSE(SkeletonManager::getSingleton().create("Collision", "Tests"));
+
+    EXPECT_TRUE(CompositorManager::getSingleton().create("Collision", "Tests"));
+    EXPECT_FALSE(CompositorManager::getSingleton().create("Collision", "Tests"));
+
+    EXPECT_TRUE(HighLevelGpuProgramManager::getSingleton().createProgram(
+        "Collision", "Tests", "null", GPT_VERTEX_PROGRAM));
+    EXPECT_FALSE(HighLevelGpuProgramManager::getSingleton().createProgram(
+        "Collision", "Tests", "null", GPT_VERTEX_PROGRAM));
+}
+
+typedef RootWithoutRenderSystemFixture TextureTests;
+TEST_F(TextureTests, Blank)
+{
+    auto mat = std::make_shared<Material>(nullptr, "Material Name", 0, "Group");
+    auto tus = mat->createTechnique()->createPass()->createTextureUnitState();
+
+    EXPECT_EQ(tus->isBlank(), true);
+    EXPECT_EQ(tus->getTextureName(), "");
+    EXPECT_EQ(tus->getTextureType(), TEX_TYPE_2D);
+    EXPECT_EQ(tus->getNumMipmaps(), MIP_DEFAULT);
+    EXPECT_EQ(tus->getDesiredFormat(), PF_UNKNOWN);
+    EXPECT_EQ(tus->getFrameTextureName(0), "");
+    EXPECT_EQ(tus->getIsAlpha(), false);
+    EXPECT_EQ(tus->getGamma(), 1.0f);
+    EXPECT_EQ(tus->isHardwareGammaEnabled(), false);
 }

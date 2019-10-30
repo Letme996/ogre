@@ -64,11 +64,9 @@ namespace OgreBites
         -----------------------------------------------------------------------------*/
         virtual void runSample(Sample* s)
         {
-#if OGRE_PROFILING
             Ogre::Profiler* prof = Ogre::Profiler::getSingletonPtr();
             if (prof)
                 prof->setEnabled(false);
-#endif
 
             if (mCurrentSample)
             {
@@ -105,24 +103,14 @@ namespace OgreBites
                     }
                 }
 
-                // throw an exception if samples requires the use of another renderer
-                Ogre::String rrs = s->getRequiredRenderSystem();
-                if (!rrs.empty() && rrs != mRoot->getRenderSystem()->getName())
-                {
-                    Ogre::String desc = "Sample only runs with renderer: " + rrs;
-                    Ogre::String src = "SampleContext::runSample";
-                    OGRE_EXCEPT(Ogre::Exception::ERR_INVALID_STATE, desc, src);
-                }
-
                 // test system capabilities against sample requirements
                 s->testCapabilities(mRoot->getRenderSystem()->getCapabilities());
 
                 s->_setup(mWindow, mFSLayer, mOverlaySystem);   // start new sample
             }
-#if OGRE_PROFILING
+
             if (prof)
                 prof->setEnabled(true);
-#endif
 
             mCurrentSample = s;
         }
@@ -175,16 +163,15 @@ namespace OgreBites
         }
 
         virtual void loadStartUpSample() {}
-        
-        virtual bool isCurrentSamplePaused()
+
+        bool isCurrentSamplePaused()
         {
-            if (mCurrentSample) return mSamplePaused;
-            return false;
+            return !mCurrentSample || mSamplePaused;
         }
 
         virtual void pauseCurrentSample()
         {
-            if (mCurrentSample && !mSamplePaused)
+            if (!isCurrentSamplePaused())
             {
                 mSamplePaused = true;
                 mCurrentSample->paused();
@@ -208,7 +195,7 @@ namespace OgreBites
             pollEvents();
 
             // manually call sample callback to ensure correct order
-            return (mCurrentSample && !mSamplePaused) ? mCurrentSample->frameStarted(evt) : true;
+            return !isCurrentSamplePaused() ? mCurrentSample->frameStarted(evt) : true;
         }
             
         /*-----------------------------------------------------------------------------
@@ -217,7 +204,7 @@ namespace OgreBites
         virtual bool frameRenderingQueued(const Ogre::FrameEvent& evt)
         {
             // manually call sample callback to ensure correct order
-            return (mCurrentSample && !mSamplePaused) ? mCurrentSample->frameRenderingQueued(evt) : true;
+            return !isCurrentSamplePaused() ? mCurrentSample->frameRenderingQueued(evt) : true;
         }
             
         /*-----------------------------------------------------------------------------
@@ -242,30 +229,30 @@ namespace OgreBites
         virtual void windowResized(Ogre::RenderWindow* rw)
         {
             // manually call sample callback to ensure correct order
-            if (mCurrentSample && !mSamplePaused) mCurrentSample->windowResized(rw);
+            if (!isCurrentSamplePaused()) mCurrentSample->windowResized(rw);
         }
 
         // window event callbacks which manually call their respective sample callbacks to ensure correct order
 
         virtual void windowMoved(Ogre::RenderWindow* rw)
         {
-            if (mCurrentSample && !mSamplePaused) mCurrentSample->windowMoved(rw);
+            if (!isCurrentSamplePaused()) mCurrentSample->windowMoved(rw);
         }
 
         virtual bool windowClosing(Ogre::RenderWindow* rw)
         {
-            if (mCurrentSample && !mSamplePaused) return mCurrentSample->windowClosing(rw);
+            if (!isCurrentSamplePaused()) return mCurrentSample->windowClosing(rw);
             return true;
         }
 
         virtual void windowClosed(Ogre::RenderWindow* rw)
         {
-            if (mCurrentSample && !mSamplePaused) mCurrentSample->windowClosed(rw);
+            if (!isCurrentSamplePaused()) mCurrentSample->windowClosed(rw);
         }
 
         virtual void windowFocusChange(Ogre::RenderWindow* rw)
         {
-            if (mCurrentSample && !mSamplePaused) mCurrentSample->windowFocusChange(rw);
+            if (!isCurrentSamplePaused()) mCurrentSample->windowFocusChange(rw);
         }
 
         // keyboard and mouse callbacks which manually call their respective sample callbacks to ensure correct order
@@ -275,150 +262,61 @@ namespace OgreBites
             // Ignore repeated signals from key being held down.
             if (evt.repeat) return true;
 
-            if (mCurrentSample && !mSamplePaused) return mCurrentSample->keyPressed(evt);
+            if (!isCurrentSamplePaused()) return mCurrentSample->keyPressed(evt);
             return true;
         }
 
         virtual bool keyReleased(const KeyboardEvent& evt)
         {
-            if (mCurrentSample && !mSamplePaused) return mCurrentSample->keyReleased(evt);
+            if (!isCurrentSamplePaused()) return mCurrentSample->keyReleased(evt);
             return true;
-        }
-
-        void transformInputState(TouchFingerEvent &state)
-        {
-#if 0
-            int w = mWindow->getViewport(0)->getActualWidth();
-            int h = mWindow->getViewport(0)->getActualHeight();
-            int absX = state.X.abs;
-            int absY = state.Y.abs;
-            int relX = state.X.rel;
-            int relY = state.Y.rel;
-
-            // as OIS work in windowing system units we need to convert them to pixels
-            float scale = mWindow->getViewPointToPixelScale();
-            if(scale != 1.0f)
-            {
-                absX = (int)(absX * scale);
-                absY = (int)(absY * scale);
-                relX = (int)(relX * scale);
-                relY = (int)(relY * scale);
-            }
-
-            // determine required orientation
-            Ogre::OrientationMode orientation = Ogre::OR_DEGREE_0;
-#    if (OGRE_NO_VIEWPORT_ORIENTATIONMODE == 0)
-            orientation = mWindow->getViewport(0)->getOrientationMode();
-#    elif (OGRE_NO_VIEWPORT_ORIENTATIONMODE == 1) && (OGRE_PLATFORM == OGRE_PLATFORM_APPLE_IOS)
-            UIInterfaceOrientation interfaceOrientation = [UIApplication sharedApplication].statusBarOrientation;
-            switch (interfaceOrientation)
-            {
-            case UIInterfaceOrientationPortrait:           break;
-            case UIInterfaceOrientationLandscapeLeft:      orientation = Ogre::OR_DEGREE_90;  break;
-            case UIInterfaceOrientationPortraitUpsideDown: orientation = Ogre::OR_DEGREE_180; break;
-            case UIInterfaceOrientationLandscapeRight:     orientation = Ogre::OR_DEGREE_270; break;
-            }
-#    endif
-
-            // apply changes
-            switch (orientation)
-            {
-            case Ogre::OR_DEGREE_0:
-                state.X.abs = absX;
-                state.Y.abs = absY;
-                state.X.rel = relX;
-                state.Y.rel = relY;
-                state.width = w;
-                state.height = h;
-                break;
-            case Ogre::OR_DEGREE_90:
-                state.X.abs = w - absY;
-                state.Y.abs = absX;
-                state.X.rel = -relY;
-                state.Y.rel = relX;
-                state.width = h;
-                state.height = w;
-                break;
-            case Ogre::OR_DEGREE_180:
-                state.X.abs = w - absX;
-                state.Y.abs = h - absY;
-                state.X.rel = -relX;
-                state.Y.rel = -relY;
-                state.width = w;
-                state.height = h;
-                break;
-            case Ogre::OR_DEGREE_270:
-                state.X.abs = absY;
-                state.Y.abs = h - absX;
-                state.X.rel = relY;
-                state.Y.rel = -relX;
-                state.width = h;
-                state.height = w;
-                break;
-            }
-#endif
         }
 
         virtual bool touchMoved(const TouchFingerEvent& evt)
         {
-            if (mCurrentSample && !mSamplePaused)
+            if (!isCurrentSamplePaused())
                 return mCurrentSample->touchMoved(evt);
             return true;
         }
 
         virtual bool mouseMoved(const MouseMotionEvent& evt)
         {
-            // Miniscule mouse movements are still considered hovering.
-            // if (evt.xrel > 100000 || evt.yrel > 100000)
-            // {
-            //     mTimeSinceMouseMoved = 0;
-            // }
-
-            if (mCurrentSample && !mSamplePaused)
+            if (!isCurrentSamplePaused())
                 return mCurrentSample->mouseMoved(evt);
             return true;
         }
 
         virtual bool touchPressed(const TouchFingerEvent& evt)
         {
-            if (mCurrentSample && !mSamplePaused)
+            if (!isCurrentSamplePaused())
                 return mCurrentSample->touchPressed(evt);
             return true;
         }
 
         virtual bool mousePressed(const MouseButtonEvent& evt)
         {
-            if (mCurrentSample && !mSamplePaused)
+            if (!isCurrentSamplePaused())
                 return mCurrentSample->mousePressed(evt);
             return true;
         }
 
         virtual bool touchReleased(const TouchFingerEvent& evt)
         {
-            if (mCurrentSample && !mSamplePaused)
+            if (!isCurrentSamplePaused())
                 return mCurrentSample->touchReleased(evt);
             return true;
         }
 
         virtual bool mouseReleased(const MouseButtonEvent& evt)
         {
-            if (mCurrentSample && !mSamplePaused)
+            if (!isCurrentSamplePaused())
                 return mCurrentSample->mouseReleased(evt);
             return true;
         }
 
-#if (OGRE_PLATFORM == OGRE_PLATFORM_APPLE_IOS) || (OGRE_PLATFORM == OGRE_PLATFORM_ANDROID)
-        //FIXME: Handle mouse wheel wheel events on mobile devices.
-        // virtual bool touchReleased(const SDL_TouchFingerEvent& evt)
-        // {
-        //     if (mCurrentSample && !mSamplePaused)
-        //         return mCurrentSample->touchReleased(evt);
-        //     return true;
-        // }
-#endif
         virtual bool mouseWheelRolled(const MouseWheelEvent& evt)
         {
-            if (mCurrentSample && !mSamplePaused)
+            if (!isCurrentSamplePaused())
                 return mCurrentSample->mouseWheelRolled(evt);
             return true;
         }

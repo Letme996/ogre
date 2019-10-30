@@ -117,12 +117,12 @@ CompositorChain *CompositorManager::getCompositorChain(Viewport *vp)
     }
 }
 //-----------------------------------------------------------------------
-bool CompositorManager::hasCompositorChain(Viewport *vp) const
+bool CompositorManager::hasCompositorChain(const Viewport *vp) const
 {
     return mChains.find(vp) != mChains.end();
 }
 //-----------------------------------------------------------------------
-void CompositorManager::removeCompositorChain(Viewport *vp)
+void CompositorManager::removeCompositorChain(const Viewport *vp)
 {
     Chains::iterator i = mChains.find(vp);
     if (i != mChains.end())
@@ -175,44 +175,32 @@ CompositorInstance *CompositorManager::addCompositor(Viewport *vp, const String 
 void CompositorManager::removeCompositor(Viewport *vp, const String &compositor)
 {
     CompositorChain *chain = getCompositorChain(vp);
-    for(size_t pos=0; pos < chain->getNumCompositors(); ++pos)
-    {
-        CompositorInstance *instance = chain->getCompositor(pos);
-        if(instance->getCompositor()->getName() == compositor)
-        {
-            chain->removeCompositor(pos);
-            break;
-        }
-    }
+    size_t pos = chain->getCompositorPosition(compositor);
+
+    if(pos != CompositorChain::NPOS)
+        chain->removeCompositor(pos);
 }
 //-----------------------------------------------------------------------
 void CompositorManager::setCompositorEnabled(Viewport *vp, const String &compositor, bool value)
 {
     CompositorChain *chain = getCompositorChain(vp);
-    for(size_t pos=0; pos < chain->getNumCompositors(); ++pos)
-    {
-        CompositorInstance *instance = chain->getCompositor(pos);
-        if(instance->getCompositor()->getName() == compositor)
-        {
-            chain->setCompositorEnabled(pos, value);
-            break;
-        }
-    }
+    size_t pos = chain->getCompositorPosition(compositor);
+
+    if(pos != CompositorChain::NPOS)
+        chain->setCompositorEnabled(pos, value);
 }
 //---------------------------------------------------------------------
 void CompositorManager::_reconstructAllCompositorResources()
 {
     // In order to deal with shared resources, we have to disable *all* compositors
     // first, that way shared resources will get freed
-    typedef vector<CompositorInstance*>::type InstVec;
+    typedef std::vector<CompositorInstance*> InstVec;
     InstVec instancesToReenable;
     for (Chains::iterator i = mChains.begin(); i != mChains.end(); ++i)
     {
         CompositorChain* chain = i->second;
-        CompositorChain::InstanceIterator instIt = chain->getCompositors();
-        while (instIt.hasMoreElements())
+        for (CompositorInstance* inst : chain->getCompositorInstances())
         {
-            CompositorInstance* inst = instIt.getNext();
             if (inst->getEnabled())
             {
                 inst->setEnabled(false);
@@ -234,7 +222,7 @@ void CompositorManager::_reconstructAllCompositorResources()
 //---------------------------------------------------------------------
 TexturePtr CompositorManager::getPooledTexture(const String& name, 
     const String& localName,
-    size_t w, size_t h, PixelFormat f, uint aa, const String& aaHint, bool srgb, 
+    uint32 w, uint32 h, PixelFormat f, uint aa, const String& aaHint, bool srgb,
     CompositorManager::UniqueTextureSet& texturesAssigned, 
     CompositorInstance* inst, CompositionTechnique::TextureScope scope)
 {
@@ -262,23 +250,19 @@ TexturePtr CompositorManager::getPooledTexture(const String& name,
             ResourceGroupManager::INTERNAL_RESOURCE_GROUP_NAME, TEX_TYPE_2D, 
             (uint)w, (uint)h, 0, f, TU_RENDERTARGET, 0,
             srgb, aa, aaHint);
-        defMap.insert(TextureDefMap::value_type(def, newTex));
+        defMap.emplace(def, newTex);
         return newTex;
     }
 
-    TexturesByDef::iterator i = mTexturesByDef.find(def);
-    if (i == mTexturesByDef.end())
-    {
-        TextureList* texList = OGRE_NEW_T(TextureList, MEMCATEGORY_GENERAL);
-        i = mTexturesByDef.insert(TexturesByDef::value_type(def, texList)).first;
-    }
+    TexturesByDef::iterator i = mTexturesByDef.emplace(def, TextureList()).first;
+
     CompositorInstance* previous = inst->getChain()->getPreviousInstance(inst);
     CompositorInstance* next = inst->getChain()->getNextInstance(inst);
 
     TexturePtr ret;
-    TextureList* texList = i->second;
+    TextureList& texList = i->second;
     // iterate over the existing textures and check if we can re-use
-    for (TextureList::iterator t = texList->begin(); t != texList->end(); ++t)
+    for (TextureList::iterator t = texList.begin(); t != texList.end(); ++t)
     {
         TexturePtr& tex = *t;
         // check not already used
@@ -322,10 +306,10 @@ TexturePtr CompositorManager::getPooledTexture(const String& name,
         ret = TextureManager::getSingleton().createManual(
             name, 
             ResourceGroupManager::INTERNAL_RESOURCE_GROUP_NAME, TEX_TYPE_2D, 
-            (uint)w, (uint)h, 0, f, TU_RENDERTARGET, 0,
+            w, h, 0, f, TU_RENDERTARGET, 0,
             srgb, aa, aaHint); 
 
-        texList->push_back(ret);
+        texList.push_back(ret);
 
     }
 
@@ -421,8 +405,8 @@ void CompositorManager::freePooledTextures(bool onlyIfUnreferenced)
     {
         for (TexturesByDef::iterator i = mTexturesByDef.begin(); i != mTexturesByDef.end(); ++i)
         {
-            TextureList* texList = i->second;
-            for (TextureList::iterator j = texList->begin(); j != texList->end();)
+            TextureList& texList = i->second;
+            for (TextureList::iterator j = texList.begin(); j != texList.end();)
             {
                 // if the resource system, plus this class, are the only ones to have a reference..
                 // NOTE: any material references will stop this texture getting freed (e.g. compositor demo)
@@ -430,7 +414,7 @@ void CompositorManager::freePooledTextures(bool onlyIfUnreferenced)
                 if (j->use_count() == ResourceGroupManager::RESOURCE_SYSTEM_NUM_REFERENCE_COUNTS + 1)
                 {
                     TextureManager::getSingleton().remove((*j)->getHandle());
-                    j = texList->erase(j);
+                    j = texList.erase(j);
                 }
                 else
                     ++j;
@@ -455,10 +439,6 @@ void CompositorManager::freePooledTextures(bool onlyIfUnreferenced)
     else
     {
         // destroy all
-        for (TexturesByDef::iterator i = mTexturesByDef.begin(); i != mTexturesByDef.end(); ++i)
-        {
-            OGRE_DELETE_T(i->second, TextureList, MEMCATEGORY_GENERAL);
-        }
         mTexturesByDef.clear();
         mChainTexturesByDef.clear();
     }
@@ -507,10 +487,9 @@ CompositorLogic* CompositorManager::getCompositorLogic(const String& name)
     return it->second;
 }
 //---------------------------------------------------------------------
-bool CompositorManager::getHasCompositorLogic(const String& name)
+bool CompositorManager::hasCompositorLogic(const String& name)
 {
-	CompositorLogicMap::iterator it = mCompositorLogics.find(name);
-	return it == mCompositorLogics.end() ? false : true;
+	return mCompositorLogics.find(name) != mCompositorLogics.end();
 }
 //---------------------------------------------------------------------
 void CompositorManager::registerCustomCompositionPass(const String& name, CustomCompositionPass* logic)
@@ -530,7 +509,7 @@ void CompositorManager::registerCustomCompositionPass(const String& name, Custom
     mCustomCompositionPasses[name] = logic;
 }
 //---------------------------------------------------------------------
-void CompositorManager::unRegisterCustomCompositionPass(const String& name)
+void CompositorManager::unregisterCustomCompositionPass(const String& name)
 {	
 	CustomCompositionPassMap::iterator itor = mCustomCompositionPasses.find(name);
 	if( itor == mCustomCompositionPasses.end() )
@@ -542,10 +521,9 @@ void CompositorManager::unRegisterCustomCompositionPass(const String& name)
 	mCustomCompositionPasses.erase( itor );
 }
 //---------------------------------------------------------------------
-bool CompositorManager::getHasCompositionPass(const String& name)
+bool CompositorManager::hasCustomCompositionPass(const String& name)
 {
-	CustomCompositionPassMap::iterator it = mCustomCompositionPasses.find(name);
-	return it == mCustomCompositionPasses.end() ? false : true;
+	return mCustomCompositionPasses.find(name) != mCustomCompositionPasses.end();
 }
 //---------------------------------------------------------------------
 CustomCompositionPass* CompositorManager::getCustomCompositionPass(const String& name)

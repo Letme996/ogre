@@ -69,7 +69,7 @@ namespace Ogre {
             /// Get the number of vertices in this buffer
             size_t getNumVertices(void) const { return mNumVertices; }
             /// Get if this vertex buffer is an "instance data" buffer (per instance)
-            bool getIsInstanceData() const { return mIsInstanceData; }
+            bool isInstanceData() const { return mIsInstanceData; }
             /// Set if this vertex buffer is an "instance data" buffer (per instance)
             void setIsInstanceData(const bool val);
             /// Get the number of instances to draw using the same per-instance data before advancing in the buffer by one element.
@@ -82,8 +82,8 @@ namespace Ogre {
 
     };
 
-    /** Locking helper. */    
-    typedef HardwareBufferLockGuard<HardwareVertexBufferSharedPtr> HardwareVertexBufferLockGuard;
+    /// @deprecated use HardwareBufferLockGuard directly
+    OGRE_DEPRECATED typedef HardwareBufferLockGuard HardwareVertexBufferLockGuard;
 
     /// Vertex element semantics, used to identify the meaning of vertex buffer contents
     enum VertexElementSemantic {
@@ -322,23 +322,13 @@ namespace Ogre {
     };
     /** This class declares the format of a set of vertex inputs, which
         can be issued to the rendering API through a RenderOperation.
-    @remarks
-    You should be aware that the ordering and structure of the
-    VertexDeclaration can be very important on DirectX with older
-    cards,so if you want to maintain maximum compatibility with
-    all render systems and all cards you should be careful to follow these
-    rules:<ol>
-    <li>VertexElements should be added in the following order, and the order of the
-    elements within a shared buffer should be as follows:
-    position, blending weights, normals, diffuse colours, specular colours,
-            texture coordinates (in order, with no gaps)</li>
-    <li>You must not have unused gaps in your buffers which are not referenced
-    by any VertexElement</li>
-    <li>You must not cause the buffer & offset settings of 2 VertexElements to overlap</li>
-    </ol>
+
+    The ordering is important on Direct3D9 with Direct3D 7 grade cards.
+    Calling closeGapsInSource() will format this VertexDeclaration accordingly.
+
     Whilst GL and more modern graphics cards in D3D will allow you to defy these rules,
-    sticking to them will ensure that your buffers have the maximum compatibility.
-    @par
+    sticking to them will reduce state changes and improve performance on modern APIs as well.
+
     Like the other classes in this functional area, these declarations should be created and
     destroyed using the HardwareBufferManager.
     */
@@ -346,7 +336,7 @@ namespace Ogre {
     {
     public:
         /// Defines the list of vertex elements that makes up this declaration
-        typedef list<VertexElement>::type VertexElementList;
+        typedef std::list<VertexElement> VertexElementList;
         /// Sort routine for vertex elements
         static bool vertexElementLess(const VertexElement& e1, const VertexElement& e2);
     protected:
@@ -366,13 +356,10 @@ namespace Ogre {
         /** Get a single element. */
         const VertexElement* getElement(unsigned short index) const;
 
-        /** Sorts the elements in this list to be compatible with the maximum
-            number of rendering APIs / graphics cards.
-        @remarks
-            Older graphics cards require vertex data to be presented in a more
-            rigid way, as defined in the main documentation for this class. As well
-            as the ordering being important, where shared source buffers are used, the
-            declaration must list all the elements for each source in turn.
+        /** Sorts the elements in this list to be compatible with D3D7 graphics cards
+
+           the order is as follows: position, blending weights, normals, diffuse colours, specular colours,
+           texture coordinates
         */
         void sort(void);
 
@@ -384,7 +371,7 @@ namespace Ogre {
             need to alter that too. This method is mainly useful when reorganising
             buffers based on an altered declaration.
         @note
-            This will cause the vertex declaration to be re-sorted.
+            This will also call sort()
         */
         void closeGapsInSource(void);
 
@@ -490,7 +477,7 @@ namespace Ogre {
         @param mgr Optional HardwareBufferManager to use for creating the clone
             (if null, use the current default).
         */
-        VertexDeclaration* clone(HardwareBufferManagerBase* mgr = 0) const;
+        VertexDeclaration* clone(HardwareBufferManagerBase* mgr = 0) const OGRE_NODISCARD;
 
         inline bool operator== (const VertexDeclaration& rhs) const
         {
@@ -533,7 +520,7 @@ namespace Ogre {
     {
     public:
         /// Defines the vertex buffer bindings used as source for vertex declarations
-        typedef map<unsigned short, HardwareVertexBufferSharedPtr>::type VertexBufferBindingMap;
+        typedef std::map<unsigned short, HardwareVertexBufferSharedPtr> VertexBufferBindingMap;
     protected:
         VertexBufferBindingMap mBindingMap;
         mutable unsigned short mHighIndex;
@@ -577,7 +564,7 @@ namespace Ogre {
         */
         unsigned short getLastBoundIndex(void) const;
 
-        typedef map<ushort, ushort>::type BindingIndexMap;
+        typedef std::map<ushort, ushort> BindingIndexMap;
 
         /** Check whether any gaps in the bindings.
         */
@@ -598,7 +585,7 @@ namespace Ogre {
         void closeGaps(BindingIndexMap& bindingIndexMap);
 
         /// Returns true if this binding has an element that contains instance data
-        bool getHasInstanceData() const;
+        bool hasInstanceData() const;
 
 
     };

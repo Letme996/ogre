@@ -32,7 +32,7 @@
 #include "OgreGLUtil.h"
 #include "OgreGLES2RenderSystem.h"
 #include "OgreRoot.h"
-#include "OgreGLES2Support.h"
+#include "OgreGLNativeSupport.h"
 
 namespace Ogre {
     
@@ -79,15 +79,15 @@ namespace Ogre {
     }
 
     //-----------------------------------------------------------------------
-    bool GLSLESProgramCommon::getMicrocodeFromCache(const String& name, GLuint programHandle)
+    bool GLSLESProgramCommon::getMicrocodeFromCache(uint32 id, GLuint programHandle)
     {
-        if (!GpuProgramManager::getSingleton().canGetCompiledShaderBuffer())
+        if (!GpuProgramManager::canGetCompiledShaderBuffer())
             return false;
 
-        if (!GpuProgramManager::getSingleton().isMicrocodeAvailableInCache(name))
+        if (!GpuProgramManager::getSingleton().isMicrocodeAvailableInCache(id))
             return false;
 
-        GpuProgramManager::Microcode cacheMicrocode = GpuProgramManager::getSingleton().getMicrocodeFromCache(name);
+        GpuProgramManager::Microcode cacheMicrocode = GpuProgramManager::getSingleton().getMicrocodeFromCache(id);
 
         // turns out we need this param when loading
         GLenum binaryFormat = 0;
@@ -113,9 +113,9 @@ namespace Ogre {
 
         return success;
     }
-    void GLSLESProgramCommon::_writeToCache(const String& name, GLuint programHandle)
+    void GLSLESProgramCommon::_writeToCache(uint32 id, GLuint programHandle)
     {
-        if(!Root::getSingleton().getRenderSystem()->getCapabilities()->hasCapability(RSC_CAN_GET_COMPILED_SHADER_BUFFER))
+        if(!GpuProgramManager::canGetCompiledShaderBuffer())
             return;
 
         if(!GpuProgramManager::getSingleton().getSaveMicrocodesToCache())
@@ -135,14 +135,13 @@ namespace Ogre {
                                                   newMicrocode->getPtr() + sizeof(GLenum)));
 
         // Add to the microcode to the cache
-        GpuProgramManager::getSingleton().addMicrocodeToCache(name, newMicrocode);
+        GpuProgramManager::getSingleton().addMicrocodeToCache(id, newMicrocode);
     }
 
 #if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID || OGRE_PLATFORM == OGRE_PLATFORM_EMSCRIPTEN
     void GLSLESProgramCommon::notifyOnContextLost()
     {
         mLinked = false;
-        mTriedToLinkAndFailed = false;
         mUniformRefsBuilt = false;
         getVertexProgram()->getUniformCache()->clearCache();
         mFragmentProgram->getUniformCache()->clearCache();

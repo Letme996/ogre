@@ -31,12 +31,12 @@ THE SOFTWARE.
 
 #include "OgrePrerequisites.h"
 #include "OgreSerializer.h"
-#include "OgreMeshSerializerImpl.h"
 #include "OgreHeaderPrefix.h"
 
 namespace Ogre {
     
     class MeshSerializerListener;
+    class MeshVersionData;
     
     /// Mesh compatibility versions
     enum MeshVersion 
@@ -162,22 +162,7 @@ namespace Ogre {
         MeshSerializerListener *getListener();
         
     protected:
-        
-        class MeshVersionData : public SerializerAlloc
-        {
-        public:
-            MeshVersion version;
-            String versionString;
-            MeshSerializerImpl* impl;
-            
-            MeshVersionData(MeshVersion _ver, const String& _string, MeshSerializerImpl* _impl)
-            : version(_ver), versionString(_string), impl(_impl) {}
-            
-            ~MeshVersionData() { OGRE_DELETE impl; }
-            
-        };
-
-        typedef vector<MeshVersionData*>::type MeshVersionDataList;
+        typedef std::vector<MeshVersionData*> MeshVersionDataList;
         MeshVersionDataList mVersionData;
 
         MeshSerializerListener *mListener;

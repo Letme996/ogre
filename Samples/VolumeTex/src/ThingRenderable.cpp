@@ -98,8 +98,7 @@ void ThingRenderable::initialise()
     VertexBufferBinding* bind = vdata->vertexBufferBinding;
 
     size_t offset = 0;
-    decl->addElement(0, offset, VET_FLOAT3, VES_POSITION);
-    offset += VertexElement::getTypeSize(VET_FLOAT3);
+    offset += decl->addElement(0, offset, VET_FLOAT3, VES_POSITION).getSize();
 
     vbuf = 
     HardwareBufferManager::getSingleton().createVertexBuffer(
@@ -168,13 +167,6 @@ Ogre::Real ThingRenderable::getBoundingRadius() const
 }
 Ogre::Real ThingRenderable::getSquaredViewDepth(const Ogre::Camera* cam) const
 {
-    Ogre::Vector3 min, max, mid, dist;
-
-    min = mBox.getMinimum();
-    max = mBox.getMaximum();
-    mid = ((min - max) * 0.5) + min;
-    dist = cam->getDerivedPosition() - mid;
-                                                                        
-    return dist.squaredLength();
+    return (cam->getDerivedPosition() - mBox.getCenter()).squaredLength();
 }
 

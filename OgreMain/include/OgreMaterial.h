@@ -50,8 +50,8 @@ namespace Ogre {
     *  @{
     */
     /** Class encapsulates rendering properties of an object.
-    @remarks
-    Ogre's material class encapsulates ALL aspects of the visual appearance,
+
+    %Ogre's material class encapsulates *all* aspects of the visual appearance,
     of an object. It also includes other flags which 
     might not be traditionally thought of as material properties such as 
     culling modes and depth buffer settings, but these affect the 
@@ -60,7 +60,7 @@ namespace Ogre {
     different to Direct3D which treats a material as just the colour 
     components (diffuse, specular) and not texture maps etc. An Ogre 
     Material can be thought of as equivalent to a 'Shader'.
-    @par
+
     A Material can be rendered in multiple different ways depending on the
     hardware available. You may configure a Material to use high-complexity
     fragment shaders, but these won't work on every card; therefore a Technique
@@ -68,8 +68,8 @@ namespace Ogre {
     to create fallback techniques with lower hardware requirements if you decide to
     use advanced features. In addition, you also might want lower-detail techniques
     for distant geometry.
-    @par
-    Each technique can be made up of multiple passes. A fixed-function pass
+
+    Each Technique can be made up of multiple passes. A fixed-function Pass
     may combine multiple texture layers using multitexturing, but Ogre can 
     break that into multiple passes automatically if the active card cannot
     handle that many simultaneous textures. Programmable passes, however, cannot
@@ -78,11 +78,11 @@ namespace Ogre {
     which the card can do. If, at the end of the day, the card cannot handle any of the
     techniques which are listed for the material, the engine will render the 
     geometry plain white, which should alert you to the problem.
-    @par
-    Ogre comes configured with a number of default settings for a newly 
+
+    %Ogre comes configured with a number of default settings for a newly 
     created material. These can be changed if you wish by retrieving the 
     default material settings through 
-    SceneManager::getDefaultMaterialSettings. Any changes you make to the 
+    MaterialManager::getDefaultSettings. Any changes you make to the
     Material returned from this method will apply to any materials created 
     from this point onward.
     */
@@ -93,9 +93,9 @@ namespace Ogre {
 
     public:
         /// distance list used to specify LOD
-        typedef vector<Real>::type LodValueList;
+        typedef std::vector<Real> LodValueList;
         typedef ConstVectorIterator<LodValueList> LodValueIterator;
-        typedef vector<Technique*>::type Techniques;
+        typedef std::vector<Technique*> Techniques;
     protected:
 
 
@@ -107,8 +107,8 @@ namespace Ogre {
         Techniques mTechniques;
         /// Supported techniques of any sort
         Techniques mSupportedTechniques;
-        typedef map<unsigned short, Technique*>::type LodTechniques;
-        typedef map<unsigned short, LodTechniques*>::type BestTechniquesBySchemeList;
+        typedef std::map<unsigned short, Technique*> LodTechniques;
+        typedef std::map<unsigned short, LodTechniques*> BestTechniquesBySchemeList;
         /** Map of scheme -> list of LOD techniques. 
             Current scheme is set on MaterialManager,
             and can be set per Viewport for auto activation.
@@ -132,17 +132,9 @@ namespace Ogre {
         */
         void clearBestTechniqueList(void);
 
-        /** Overridden from Resource.
-        */
-        void prepareImpl(void);
-
-        /** Overridden from Resource.
-        */
-        void unprepareImpl(void);
-
-        /** Overridden from Resource.
-        */
-        void loadImpl(void);
+        void prepareImpl(void) override;
+        void unprepareImpl(void) override;
+        void loadImpl(void) override;
 
         /** Unloads the material, frees resources etc.
         @see
@@ -214,11 +206,11 @@ namespace Ogre {
         Technique* createTechnique(void);
         /** Gets the indexed technique.
          * @deprecated use getTechniques()  */
-        Technique* getTechnique(unsigned short index);
+        Technique* getTechnique(unsigned short index) const;
         /** searches for the named technique.
             Return 0 if technique with name is not found
         */
-        Technique* getTechnique(const String& name);
+        Technique* getTechnique(const String& name) const;
         /** Retrieves the number of techniques.
          * @deprecated use getTechniques()  */
         unsigned short getNumTechniques(void) const;
@@ -345,7 +337,7 @@ namespace Ogre {
             property there.
         @see Pass::setAmbient
         */
-        void setAmbient(Real red, Real green, Real blue);
+        void setAmbient(float red, float green, float blue);
 
         /// @overload
         void setAmbient(const ColourValue& ambient);
@@ -359,7 +351,7 @@ namespace Ogre {
             property there.
         @see Pass::setDiffuse
         */
-        void setDiffuse(Real red, Real green, Real blue, Real alpha);
+        void setDiffuse(float red, float green, float blue, float alpha);
 
         /// @overload
         void setDiffuse(const ColourValue& diffuse);
@@ -373,7 +365,7 @@ namespace Ogre {
             property there.
         @see Pass::setSpecular
         */
-        void setSpecular(Real red, Real green, Real blue, Real alpha);
+        void setSpecular(float red, float green, float blue, float alpha);
 
         /// @overload
         void setSpecular(const ColourValue& specular);
@@ -398,7 +390,7 @@ namespace Ogre {
             property there.
         @see Pass::setSelfIllumination
         */
-        void setSelfIllumination(Real red, Real green, Real blue);
+        void setSelfIllumination(float red, float green, float blue);
 
         /// @overload
         void setSelfIllumination(const ColourValue& selfIllum);
@@ -446,6 +438,11 @@ namespace Ogre {
         @see Pass::setColourWriteEnabled
         */
         void setColourWriteEnabled(bool enabled);
+
+        /** Sets which colour buffer channels are enabled for writing for each Pass.
+         @see Pass::setColourWriteEnabled
+         */
+        void setColourWriteEnabled(bool red, bool green, bool blue, bool alpha);
 
         /** Sets the culling mode for each pass  based on the 'vertex winding'.
         @note
@@ -504,7 +501,7 @@ namespace Ogre {
             bool overrideScene,
             FogMode mode = FOG_NONE,
             const ColourValue& colour = ColourValue::White,
-            Real expDensity = 0.001, Real linearStart = 0.0, Real linearEnd = 1.0 );
+            Real expDensity = 0.001f, Real linearStart = 0.0f, Real linearEnd = 1.0f );
 
         /** Sets the depth bias to be used for each Pass.
         @note

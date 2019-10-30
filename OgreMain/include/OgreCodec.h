@@ -54,7 +54,7 @@ namespace Ogre {
     class _OgreExport Codec : public CodecAlloc
     {
     protected:
-        typedef map< String, Codec* >::type CodecList; 
+        typedef std::map< String, Codec* > CodecList; 
         /** A map that contains all the registered codecs.
         */
         static CodecList msMapCodecs;
@@ -82,8 +82,8 @@ namespace Ogre {
         {
             CodecList::iterator i = msMapCodecs.find(pCodec->getType());
             if (i != msMapCodecs.end())
-                OGRE_EXCEPT(Exception::ERR_DUPLICATE_ITEM, 
-                    pCodec->getType() + " already has a registered codec. ", __FUNCTION__);
+                OGRE_EXCEPT(Exception::ERR_DUPLICATE_ITEM,
+                            pCodec->getType() + " already has a registered codec.");
 
             msMapCodecs[pCodec->getType()] = pCodec;
         }

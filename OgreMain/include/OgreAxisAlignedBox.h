@@ -28,6 +28,8 @@ THE SOFTWARE.
 #ifndef __AxisAlignedBox_H_
 #define __AxisAlignedBox_H_
 
+#include <array>
+
 // Precompiler options
 #include "OgrePrerequisites.h"
 
@@ -64,7 +66,6 @@ namespace Ogre {
         Vector3 mMinimum;
         Vector3 mMaximum;
         Extent mExtent;
-        mutable Vector3* mCorners;
 
     public:
         /*
@@ -77,7 +78,7 @@ namespace Ogre {
         |/      |/
         6-------7
         */
-        typedef enum {
+        enum CornerEnum {
             FAR_LEFT_BOTTOM = 0,
             FAR_LEFT_TOP = 1,
             FAR_RIGHT_TOP = 2,
@@ -86,63 +87,32 @@ namespace Ogre {
             NEAR_LEFT_BOTTOM = 6,
             NEAR_LEFT_TOP = 5,
             NEAR_RIGHT_TOP = 4
-        } CornerEnum;
-        inline AxisAlignedBox() : mMinimum(Vector3::ZERO), mMaximum(Vector3::UNIT_SCALE), mCorners(0)
+        };
+        typedef std::array<Vector3, 8> Corners;
+
+        AxisAlignedBox()
         {
             // Default to a null box 
             setMinimum( -0.5, -0.5, -0.5 );
             setMaximum( 0.5, 0.5, 0.5 );
             mExtent = EXTENT_NULL;
         }
-        inline AxisAlignedBox(Extent e) : mMinimum(Vector3::ZERO), mMaximum(Vector3::UNIT_SCALE), mCorners(0)
+        AxisAlignedBox(Extent e)
         {
             setMinimum( -0.5, -0.5, -0.5 );
             setMaximum( 0.5, 0.5, 0.5 );
             mExtent = e;
         }
 
-        inline AxisAlignedBox(const AxisAlignedBox & rkBox) : mMinimum(Vector3::ZERO), mMaximum(Vector3::UNIT_SCALE), mCorners(0)
-
-        {
-            if (rkBox.isNull())
-                setNull();
-            else if (rkBox.isInfinite())
-                setInfinite();
-            else
-                setExtents( rkBox.mMinimum, rkBox.mMaximum );
-        }
-
-        inline AxisAlignedBox( const Vector3& min, const Vector3& max ) : mMinimum(Vector3::ZERO), mMaximum(Vector3::UNIT_SCALE), mCorners(0)
+        AxisAlignedBox( const Vector3& min, const Vector3& max )
         {
             setExtents( min, max );
         }
 
-        inline AxisAlignedBox(
-            Real mx, Real my, Real mz,
-            Real Mx, Real My, Real Mz ) : mMinimum(Vector3::ZERO), mMaximum(Vector3::UNIT_SCALE), mCorners(0)
+        AxisAlignedBox(Real mx, Real my, Real mz, Real Mx, Real My, Real Mz)
         {
             setExtents( mx, my, mz, Mx, My, Mz );
         }
-
-        AxisAlignedBox& operator=(const AxisAlignedBox& rhs)
-        {
-            // Specifically override to avoid copying mCorners
-            if (rhs.isNull())
-                setNull();
-            else if (rhs.isInfinite())
-                setInfinite();
-            else
-                setExtents(rhs.mMinimum, rhs.mMaximum);
-
-            return *this;
-        }
-
-        ~AxisAlignedBox()
-        {
-            if (mCorners)
-                OGRE_FREE(mCorners, MEMCATEGORY_SCENE_CONTROL);
-        }
-
 
         /** Gets the minimum corner of the box.
         */
@@ -297,7 +267,7 @@ namespace Ogre {
         6-------7
         </pre>
         */
-        inline const Vector3* getAllCorners(void) const
+        inline Corners getAllCorners(void) const
         {
             assert( (mExtent == EXTENT_FINITE) && "Can't get corners of a null or infinite AAB" );
 
@@ -307,20 +277,19 @@ namespace Ogre {
             // Maximum Z face, starting with Max(all), then anticlockwise
             //   around face (looking onto the face)
             // Only for optimization/compatibility.
-            if (!mCorners)
-                mCorners = OGRE_ALLOC_T(Vector3, 8, MEMCATEGORY_SCENE_CONTROL);
+            Corners corners;
 
-            mCorners[0] = mMinimum;
-            mCorners[1].x = mMinimum.x; mCorners[1].y = mMaximum.y; mCorners[1].z = mMinimum.z;
-            mCorners[2].x = mMaximum.x; mCorners[2].y = mMaximum.y; mCorners[2].z = mMinimum.z;
-            mCorners[3].x = mMaximum.x; mCorners[3].y = mMinimum.y; mCorners[3].z = mMinimum.z;            
+            corners[0] = getCorner(FAR_LEFT_BOTTOM);
+            corners[1] = getCorner(FAR_LEFT_TOP);
+            corners[2] = getCorner(FAR_RIGHT_TOP);
+            corners[3] = getCorner(FAR_RIGHT_BOTTOM);
 
-            mCorners[4] = mMaximum;
-            mCorners[5].x = mMinimum.x; mCorners[5].y = mMaximum.y; mCorners[5].z = mMaximum.z;
-            mCorners[6].x = mMinimum.x; mCorners[6].y = mMinimum.y; mCorners[6].z = mMaximum.z;
-            mCorners[7].x = mMaximum.x; mCorners[7].y = mMinimum.y; mCorners[7].z = mMaximum.z;
+            corners[4] = getCorner(NEAR_RIGHT_TOP);
+            corners[5] = getCorner(NEAR_LEFT_TOP);
+            corners[6] = getCorner(NEAR_LEFT_BOTTOM);
+            corners[7] = getCorner(NEAR_RIGHT_BOTTOM);
 
-            return mCorners;
+            return corners;
         }
 
         /** Gets the position of one of the corners

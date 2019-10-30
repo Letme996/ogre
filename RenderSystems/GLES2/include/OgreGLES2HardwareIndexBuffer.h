@@ -48,7 +48,7 @@ namespace Ogre {
                 mBuffer.unlockImpl();
             }
 
-#if OGRE_PLATFORM == OGRE_PLATFORM_ANDROID || OGRE_PLATFORM == OGRE_PLATFORM_EMSCRIPTEN
+#if HANDLE_CONTEXT_LOSS
             /** See AndroidResource. */
             virtual void notifyOnContextLost();
         
@@ -60,18 +60,11 @@ namespace Ogre {
             GLES2HardwareIndexBuffer(HardwareBufferManagerBase* mgr, IndexType idxType, size_t numIndexes,
                                   HardwareBuffer::Usage usage,
                                   bool useShadowBuffer);
-
-            /** See HardwareBuffer. */
             void readData(size_t offset, size_t length, void* pDest);
-            /** See HardwareBuffer. */
             void writeData(size_t offset, size_t length, 
                 const void* pSource, bool discardWholeBuffer = false);
-#if OGRE_NO_GLES3_SUPPORT == 0
-            /** See HardwareBuffer. */
             void copyData(HardwareBuffer& srcBuffer, size_t srcOffset,
                       size_t dstOffset, size_t length, bool discardWholeBuffer = false);
-#endif
-            /** See HardwareBuffer. */
             void _updateFromShadow(void);
 
             inline GLuint getGLBufferId(void) const { return mBuffer.getGLBufferId(); }

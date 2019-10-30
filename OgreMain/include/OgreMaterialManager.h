@@ -33,6 +33,7 @@ THE SOFTWARE.
 #include "OgreSingleton.h"
 #include "OgreResourceManager.h"
 #include "OgreHeaderPrefix.h"
+#include "OgreTextureUnitState.h"
 
 namespace Ogre {
 
@@ -45,20 +46,26 @@ namespace Ogre {
     /** \addtogroup Materials
     *  @{
     */
-    /** Class for managing Material settings for Ogre.
-        @remarks
-            Materials control the eventual surface rendering properties of geometry. This class
-            manages the library of materials, dealing with programmatic registrations and lookups,
-            as well as loading predefined Material settings from scripts.
-        @par
-            When loaded from a script, a Material is in an 'unloaded' state and only stores the settings
-            required. It does not at that stage load any textures. This is because the material settings may be
-            loaded 'en masse' from bulk material script files, but only a subset will actually be required.
-        @par
-            Because this is a subclass of ResourceManager, any files loaded will be searched for in any path or
-            archive added to the resource paths/archives. See ResourceManager for details.
-        @par
-            For a definition of the material script format, see the Tutorials/MaterialScript.html file.
+    /** Class for managing Material settings for %Ogre.
+
+        Materials control the eventual surface rendering properties of geometry. This class
+        manages the library of materials, dealing with programmatic registrations and lookups,
+        as well as loading predefined Material settings from scripts.
+
+        When loaded from a script, a Material is in an 'unloaded' state and only stores the settings
+        required. It does not at that stage load any textures. This is because the material settings may be
+        loaded 'en masse' from bulk material script files, but only a subset will actually be required.
+
+        Because this is a subclass of ResourceManager, any files loaded will be searched for in any path or
+        archive added to the resource paths/archives. See ResourceManager for details.
+
+        For a definition of the material script format, see @ref Material-Scripts.
+
+        Ogre comes configured with a set of defaults for newly created
+        materials. If you wish to have a different set of defaults,
+        simply call getDefaultSettings() and change the returned Material's
+        settings. All materials created from then on will be configured
+        with the new defaults you have specified.
     */
     class _OgreExport MaterialManager : public ResourceManager, public Singleton<MaterialManager>
     {
@@ -118,33 +125,15 @@ namespace Ogre {
         };
 
     protected:
-
-        /// Default Texture filtering - minification
-        FilterOptions mDefaultMinFilter;
-        /// Default Texture filtering - magnification
-        FilterOptions mDefaultMagFilter;
-        /// Default Texture filtering - mipmapping
-        FilterOptions mDefaultMipFilter;
-        /// Default Texture filtering - comparison
-        FilterOptions mDefaultCompare;
-
-        bool            mDefaultCompareEnabled;
-        CompareFunction mDefaultCompareFunction;
-
-        /// Default Texture anisotropy
-        unsigned int mDefaultMaxAniso;
-        /// Serializer - Hold instance per thread if necessary
-        OGRE_THREAD_POINTER(MaterialSerializer, mSerializer);
         /// Default settings
         MaterialPtr mDefaultSettings;
 
-        /// Overridden from ResourceManager
         Resource* createImpl(const String& name, ResourceHandle handle, 
             const String& group, bool isManual, ManualResourceLoader* loader,
-            const NameValuePairList* params);
+            const NameValuePairList* params) override;
 
         /// Scheme name -> index. Never shrinks! Should be pretty static anyway
-        typedef map<String, unsigned short>::type SchemeMap;
+        typedef std::map<String, unsigned short> SchemeMap;
         /// List of material schemes
         SchemeMap mSchemes;
         /// Current material scheme
@@ -153,8 +142,8 @@ namespace Ogre {
         unsigned short mActiveSchemeIndex;
 
         /// The list of per-scheme (and general) material listeners
-        typedef list<Listener*>::type ListenerList;
-        typedef map<String, ListenerList>::type ListenerMap;
+        typedef std::list<Listener*> ListenerList;
+        typedef std::map<String, ListenerList> ListenerMap;
         ListenerMap mListenerMap;
 
     public:
@@ -224,34 +213,26 @@ namespace Ogre {
         unsigned int getDefaultAnisotropy() const;
 
         /** Returns a pointer to the default Material settings.
-            @remarks
-                Ogre comes configured with a set of defaults for newly created
-                materials. If you wish to have a different set of defaults,
-                simply call this method and change the returned Material's
-                settings. All materials created from then on will be configured
-                with the new defaults you have specified.
-            @par
-                The default settings begin as a single Technique with a single, non-programmable Pass:
-                <ul>
-                <li>ambient = ColourValue::White</li>
-                <li>diffuse = ColourValue::White</li>
-                <li>specular = ColourValue::Black</li>
-                <li>emmissive = ColourValue::Black</li>
-                <li>shininess = 0</li>
-                <li>No texture unit settings (& hence no textures)</li>
-                <li>SourceBlendFactor = SBF_ONE</li>
-                <li>DestBlendFactor = SBF_ZERO (no blend, replace with new
-                  colour)</li>
-                <li>Depth buffer checking on</li>
-                <li>Depth buffer writing on</li>
-                <li>Depth buffer comparison function = CMPF_LESS_EQUAL</li>
-                <li>Colour buffer writing on for all channels</li>
-                <li>Culling mode = CULL_CLOCKWISE</li>
-                <li>Ambient lighting = ColourValue(0.5, 0.5, 0.5) (mid-grey)</li>
-                <li>Dynamic lighting enabled</li>
-                <li>Gourad shading mode</li>
-                <li>Bilinear texture filtering</li>
-                </ul>
+
+            The default settings begin as a single Technique with a single, non-programmable Pass:
+
+            - ambient = ColourValue::White
+            - diffuse = ColourValue::White
+            - specular = ColourValue::Black
+            - emissive = ColourValue::Black
+            - shininess = 0 (not shiny)
+            - No texture unit settings (& hence no textures)
+            - SourceBlendFactor = Ogre::SBF_ONE
+            - DestBlendFactor = Ogre::SBF_ZERO (no blend, replace with new colour)
+            - Depth buffer checking on
+            - Depth buffer writing on
+            - Depth buffer comparison function = Ogre::CMPF_LESS_EQUAL
+            - Colour buffer writing on for all channels
+            - Culling mode = Ogre::CULL_CLOCKWISE
+            - Ambient lighting = ColourValue(0.5, 0.5, 0.5) (mid-grey)
+            - Dynamic lighting enabled
+            - Gourad shading mode
+            - Bilinear texture filtering
         */
         virtual MaterialPtr getDefaultSettings(void) const { return mDefaultSettings; }
 

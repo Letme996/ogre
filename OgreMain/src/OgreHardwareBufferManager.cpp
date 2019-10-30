@@ -41,15 +41,12 @@ namespace Ogre {
         assert( msSingleton );  return ( *msSingleton );  
     }
     //---------------------------------------------------------------------
-    HardwareBufferManager::HardwareBufferManager(HardwareBufferManagerBase* imp)
-        : HardwareBufferManagerBase(), mImpl(imp)
+    HardwareBufferManager::HardwareBufferManager()
     {
-
     }
     //---------------------------------------------------------------------
     HardwareBufferManager::~HardwareBufferManager()
     {
-        // mImpl must be deleted by the creator
     }
     //---------------------------------------------------------------------
     //---------------------------------------------------------------------
@@ -157,8 +154,7 @@ namespace Ogre {
     {
             OGRE_LOCK_MUTEX(mTempBuffersMutex);
         // Add copy to free temporary vertex buffers
-        mFreeTempVertexBufferMap.insert(
-            FreeTemporaryVertexBufferMap::value_type(sourceBuffer.get(), copy));
+        mFreeTempVertexBufferMap.emplace(sourceBuffer.get(), copy);
     }
     //-----------------------------------------------------------------------
     HardwareVertexBufferSharedPtr 
@@ -201,10 +197,9 @@ namespace Ogre {
             }
 
             // Insert copy into licensee list
-            mTempVertexBufferLicenses.insert(
-                TemporaryVertexBufferLicenseMap::value_type(
+            mTempVertexBufferLicenses.emplace(
                     vbuf.get(),
-                    VertexBufferLicense(sourceBuffer.get(), licenseType, EXPIRED_DELAY_FRAME_THRESHOLD, vbuf, licensee)));
+                    VertexBufferLicense(sourceBuffer.get(), licenseType, EXPIRED_DELAY_FRAME_THRESHOLD, vbuf, licensee));
             return vbuf;
         }
 
@@ -223,8 +218,7 @@ namespace Ogre {
 
             vbl.licensee->licenseExpired(vbl.buffer.get());
 
-            mFreeTempVertexBufferMap.insert(
-                FreeTemporaryVertexBufferMap::value_type(vbl.originalBufferPtr, vbl.buffer));
+            mFreeTempVertexBufferMap.emplace(vbl.originalBufferPtr, vbl.buffer);
             mTempVertexBufferLicenses.erase(i);
         }
     }
@@ -295,8 +289,7 @@ namespace Ogre {
             {
                 vbl.licensee->licenseExpired(vbl.buffer.get());
 
-                mFreeTempVertexBufferMap.insert(
-                    FreeTemporaryVertexBufferMap::value_type(vbl.originalBufferPtr, vbl.buffer));
+                mFreeTempVertexBufferMap.emplace(vbl.originalBufferPtr, vbl.buffer);
                 mTempVertexBufferLicenses.erase(icur);
             }
         }
@@ -373,7 +366,7 @@ namespace Ogre {
         std::pair<_Iter, _Iter> range = mFreeTempVertexBufferMap.equal_range(sourceBuffer);
         if (range.first != range.second)
         {
-            list<HardwareVertexBufferSharedPtr>::type holdForDelayDestroy;
+            std::list<HardwareVertexBufferSharedPtr> holdForDelayDestroy;
             for (_Iter it = range.first; it != range.second; ++it)
             {
                 if (it->second.use_count() <= 1)

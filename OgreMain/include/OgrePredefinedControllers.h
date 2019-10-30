@@ -57,7 +57,11 @@ namespace Ogre {
         Real mFrameDelay;
 
     public:
+        /// @deprecated use create()
         FrameTimeControllerValue();
+
+        static ControllerValueRealPtr create() { return std::make_shared<FrameTimeControllerValue>(); }
+
         bool frameEnded(const FrameEvent &evt);
         bool frameStarted(const FrameEvent &evt);
         Real getValue(void) const;
@@ -78,7 +82,13 @@ namespace Ogre {
     protected:
         TextureUnitState* mTextureLayer;
     public:
+        /// @deprecated use create()
         TextureFrameControllerValue(TextureUnitState* t);
+
+        static ControllerValueRealPtr create(TextureUnitState* t)
+        {
+            return std::make_shared<TextureFrameControllerValue>(t);
+        }
 
         /** Gets the frame number as a parametric value in the range [0,1]
         */
@@ -105,6 +115,10 @@ namespace Ogre {
         bool mRotate;
         TextureUnitState* mTextureLayer;
     public:
+        /// @deprecated use create
+        TexCoordModifierControllerValue(TextureUnitState* t, bool translateU = false, bool translateV = false,
+            bool scaleU = false, bool scaleV = false, bool rotate = false );
+
         /** Constructor.
             @param
                 t TextureUnitState to apply the modification to.
@@ -119,8 +133,11 @@ namespace Ogre {
             @param
                 rotate If true, the texture will be rotated by the modification.
         */
-        TexCoordModifierControllerValue(TextureUnitState* t, bool translateU = false, bool translateV = false,
-            bool scaleU = false, bool scaleV = false, bool rotate = false );
+        static ControllerValueRealPtr create(TextureUnitState* t, bool translateU = false, bool translateV = false,
+                                             bool scaleU = false, bool scaleV = false, bool rotate = false)
+        {
+            return std::make_shared<TexCoordModifierControllerValue>(t, translateU, translateV, scaleU, scaleV, rotate);
+        }
 
         Real getValue(void) const;
         void setValue(Real value);
@@ -136,7 +153,7 @@ namespace Ogre {
         need to use named parameters, retrieve the index from the param
         object before setting this controller up.
     @note
-        Retrieving a value from the program parameters is not currently 
+        Retrieving a value from the program parameters is not currently
         supported, therefore do not use this controller value as a source,
         only as a target.
     */
@@ -148,16 +165,19 @@ namespace Ogre {
         /// The index of the parameter to be read or set
         size_t mParamIndex;
     public:
+        /// @deprecated use create()
+        FloatGpuParameterControllerValue(GpuProgramParametersSharedPtr params, size_t index);
+
         /** Constructor.
             @param
                 params The parameters object to access
             @param
                 index The index of the parameter to be set
         */
-        FloatGpuParameterControllerValue(GpuProgramParametersSharedPtr params,
-                size_t index );
-
-        ~FloatGpuParameterControllerValue() {}
+        static ControllerValueRealPtr create(GpuProgramParametersSharedPtr params, size_t index)
+        {
+            return std::make_shared<FloatGpuParameterControllerValue>(params, index);
+        }
 
         Real getValue(void) const;
         void setValue(Real value);
@@ -173,15 +193,15 @@ namespace Ogre {
     class _OgreExport PassthroughControllerFunction : public ControllerFunction<Real>
     {
     public:
-        /** Constructor.
-         @param
-             deltaInput If true, signifies that the input will be a delta value such that the function should
-             add it to an internal counter before calculating the output.
-        */
+        /// @deprecated use create()
         PassthroughControllerFunction(bool deltaInput = false);
 
-        /** Overridden function.
-        */
+        /// @copydoc ControllerFunction::ControllerFunction
+        static ControllerFunctionRealPtr create(bool deltaInput = false)
+        {
+            return std::make_shared<PassthroughControllerFunction>(deltaInput);
+        }
+
         Real calculate(Real source);
     };
 
@@ -193,16 +213,20 @@ namespace Ogre {
         Real mSeqTime;
         Real mTime;
     public:
+        /// @deprecated use create()
+        AnimationControllerFunction(Real sequenceTime, Real timeOffset = 0.0f);
+
         /** Constructor.
             @param
                 sequenceTime The amount of time in seconds it takes to loop through the whole animation sequence.
             @param
                 timeOffset The offset in seconds at which to start (default is start at 0)
         */
-        AnimationControllerFunction(Real sequenceTime, Real timeOffset = 0.0f);
+        static ControllerFunctionRealPtr create(Real sequenceTime, Real timeOffset = 0.0f)
+        {
+            return std::make_shared<AnimationControllerFunction>(sequenceTime, timeOffset);
+        }
 
-        /** Overridden function.
-        */
         Real calculate(Real source);
 
         /** Set the time value manually. */
@@ -219,6 +243,9 @@ namespace Ogre {
     protected:
         Real mScale;
     public:
+        /// @deprecated use create()
+        ScaleControllerFunction(Real scalefactor, bool deltaInput);
+
         /** Constructor, requires a scale factor.
             @param
                 scalefactor The multiplier applied to the input to produce the output.
@@ -226,25 +253,18 @@ namespace Ogre {
                 deltaInput If true, signifies that the input will be a delta value such that the function should
                  add it to an internal counter before calculating the output.
         */
-        ScaleControllerFunction(Real scalefactor, bool deltaInput);
+        static ControllerFunctionRealPtr create(Real scalefactor, bool deltaInput = false)
+        {
+            return std::make_shared<ScaleControllerFunction>(scalefactor, deltaInput);
+        }
 
-        /** Overridden method.
-        */
         Real calculate(Real source);
-
     };
 
     //-----------------------------------------------------------------------
     /** Predefined controller function based on a waveform.
         @remarks
-            A waveform function translates parametric input to parametric output based on a wave. The factors
-            affecting the function are:
-            - wave type - the shape of the wave
-            - base - the base value of the output from the wave
-            - frequency - the speed of the wave in cycles per second
-            - phase - the offset of the start of the wave, e.g. 0.5 to start half-way through the wave
-            - amplitude - scales the output so that instead of lying within [0,1] it lies within [0,1] * amplitude
-            - duty cycle - the active width of a PWM signal
+            A waveform function translates parametric input to parametric output based on a wave.
         @par
             Note that for simplicity of integration with the rest of the controller insfrastructure, the output of
             the wave is parametric i.e. 0..1, rather than the typical wave output of [-1,1]. To compensate for this, the
@@ -268,19 +288,27 @@ namespace Ogre {
         Real getAdjustedInput(Real input);
 
     public:
+        /// @deprecated use create()
+        WaveformControllerFunction(WaveformType wType, Real base = 0, Real frequency = 1, Real phase = 0, Real amplitude = 1, bool deltaInput = true, Real dutyCycle = 0.5);
+
         /** Default constructor, requires at least a wave type, other parameters can be defaulted unless required.
+            @param wType the shape of the wave
+            @param base the base value of the output from the wave
+            @param frequency the speed of the wave in cycles per second
+            @param phase the offset of the start of the wave, e.g. 0.5 to start half-way through the wave
+            @param amplitude scales the output so that instead of lying within [0,1] it lies within [0,1] * amplitude
             @param
                 deltaInput If true, signifies that the input will be a delta value such that the function should
                 add it to an internal counter before calculating the output.
             @param
                 dutyCycle Used in PWM mode to specify the pulse width.
         */
-        WaveformControllerFunction(WaveformType wType, Real base = 0, Real frequency = 1, Real phase = 0, Real amplitude = 1, bool deltaInput = true, Real dutyCycle = 0.5);
+        static ControllerFunctionRealPtr create(WaveformType wType, Real base = 0, Real frequency = 1, Real phase = 0, Real amplitude = 1, bool deltaInput = true, Real dutyCycle = 0.5)
+        {
+            return std::make_shared<WaveformControllerFunction>(wType, base, frequency, phase, amplitude, deltaInput, dutyCycle);
+        }
 
-        /** Overridden function.
-        */
         Real calculate(Real source);
-
     };
 
     //-----------------------------------------------------------------------
@@ -291,6 +319,9 @@ namespace Ogre {
         std::vector<Real> mKeys;
         std::vector<Real> mValues;
     public:
+        /// @deprecated use create()
+        LinearControllerFunction(const std::vector<Real>& keys, const std::vector<Real>& values, Real frequency = 1, bool deltaInput = true);
+
         /** Constructor, requires keys and values of the function to interpolate
             @param
                 keys the x-values of the function sampling points. Value range is [0,1]. Must include at least the keys 0 and 1.
@@ -302,10 +333,11 @@ namespace Ogre {
             @remarks
                 there must be the same amount of keys and values
         */
-        LinearControllerFunction(const std::vector<Real>& keys, const std::vector<Real>& values, Real frequency = 1, bool deltaInput = true);
+        static ControllerFunctionRealPtr create(const std::vector<Real>& keys, const std::vector<Real>& values, Real frequency = 1, bool deltaInput = true)
+        {
+            return std::make_shared<LinearControllerFunction>(keys, values, frequency, deltaInput);
+        }
 
-        /** Overridden function.
-        */
         Real calculate(Real source);
     };
     //-----------------------------------------------------------------------

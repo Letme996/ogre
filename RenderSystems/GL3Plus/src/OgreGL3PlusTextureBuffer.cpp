@@ -210,7 +210,7 @@ namespace Ogre {
 
             GLenum type = GL3PlusPixelUtil::getGLOriginDataType(data.format);
 
-            if (data.format == PF_DEPTH)
+            if (PixelUtil::isDepth(data.format))
             {
                 switch (GL3PlusPixelUtil::getGLInternalFormat(data.format))
                 {
@@ -222,6 +222,10 @@ namespace Ogre {
                     case GL_DEPTH_COMPONENT24:
                     case GL_DEPTH_COMPONENT32:
                         type = GL_UNSIGNED_INT;
+                        break;
+
+                    case GL_DEPTH_COMPONENT32F:
+                        type = GL_FLOAT;
                         break;
                 }
             }
@@ -452,16 +456,15 @@ namespace Ogre {
             mRenderSystem->_getStateCacheManager()->setViewport(dstBox.left, dstBox.top, dstBox.getWidth(), dstBox.getHeight());
         }
 
+        bool isDepth = PixelUtil::isDepth(mFormat);
+
         // Process each destination slice
         for(uint32 slice = dstBox.front; slice < dstBox.back; ++slice)
         {
             if (!tempTex)
             {
                 // Bind directly
-                if (mFormat == PF_DEPTH)
-                    bindToFramebuffer(GL_DEPTH_ATTACHMENT, slice);
-                else
-                    bindToFramebuffer(GL_COLOR_ATTACHMENT0, slice);
+                bindToFramebuffer(isDepth ? GL_DEPTH_ATTACHMENT : GL_COLOR_ATTACHMENT0, slice);
             }
 
             OGRE_CHECK_GL_ERROR(glCheckFramebufferStatus(GL_DRAW_FRAMEBUFFER));
@@ -469,7 +472,7 @@ namespace Ogre {
             GLbitfield mask = GL_ZERO;
 
             // Bind the appropriate source texture to the read framebuffer
-            if (mFormat == PF_DEPTH)
+            if (isDepth)
             {
                 src->_bindToFramebuffer(GL_DEPTH_ATTACHMENT, slice, GL_READ_FRAMEBUFFER);
 
@@ -515,16 +518,8 @@ namespace Ogre {
         // Reset source texture to sane state
         mRenderSystem->_getStateCacheManager()->bindGLTexture( src->mTarget, src->mTextureID );
 
-        if (mFormat == PF_DEPTH)
-        {
-            OGRE_CHECK_GL_ERROR(glFramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
-                                                          GL_RENDERBUFFER, 0));
-        }
-        else
-        {
-            OGRE_CHECK_GL_ERROR(glFramebufferRenderbuffer(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                                                          GL_RENDERBUFFER, 0));
-        }
+        OGRE_CHECK_GL_ERROR(glFramebufferRenderbuffer(
+            GL_DRAW_FRAMEBUFFER, isDepth ? GL_DEPTH_ATTACHMENT : GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, 0));
 
         // Reset read buffer/framebuffer
         OGRE_CHECK_GL_ERROR(glReadBuffer(GL_NONE));

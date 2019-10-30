@@ -70,7 +70,11 @@ public:
         SPS_TANGENT = 9
     };
 
-    // Shader parameter content.
+    /** Shader parameter content
+     * 
+     * used to resolve Parameters across different SubRenderState instances
+     * Think of it as Semantic extended to the actual parameter content.
+     */ 
     enum Content
     {
         /// Unknown content
@@ -328,7 +332,12 @@ public:
     const String& getName() const { return mName; }
 
     /// internal function for aliasing to GLSL builtins e.g. gl_Position
-    void _rename(const String& newName) { mName = newName; }
+    void _rename(const String& newName, bool onlyLocal = false)
+    {
+        if(onlyLocal)
+            mBindName = mName;
+        mName = newName;
+    }
 
     /** Get the type of this parameter. */
     GpuConstantType getType() const { return mType; }
@@ -357,10 +366,18 @@ public:
     /** Sets the number of elements in the parameter (for arrays). */
     void setSize(size_t size) { mSize = size; }
 
+    /// track whether this was used
+    void setUsed(bool used) { mUsed = used; }
+    bool isUsed() { return mUsed; }
+
 // Attributes.
 protected:
     // Name of this parameter.
     String mName;
+
+    // only used for local renaming
+    String mBindName;
+
     // Type of this parameter.
     GpuConstantType mType;
     // Semantic of this parameter.
@@ -372,6 +389,7 @@ protected:
     // Number of elements in the parameter (for arrays)
     size_t mSize;
     
+    bool mUsed;
 };
 
 typedef ShaderParameterList::iterator           ShaderParameterIterator;
@@ -514,6 +532,20 @@ public:
         }
     }
 
+    void setGpuParameter(const Matrix3& val)
+    {
+        if (mParamsPtr == NULL) return;
+
+        if(mElementSize == 9) // check if tight packing is supported
+        {
+            mParamsPtr->_writeRawConstant(mPhysicalIndex, val, 9);
+        }
+        else
+        {
+            mParamsPtr->_writeRawConstant(mPhysicalIndex, Matrix4(val), mElementSize);
+        }
+    }
+
     /** Update the GPU parameter with the given value. */   
     void setGpuParameter(const Matrix4& val)  
     { 
@@ -550,6 +582,16 @@ public:
         }
     }
 
+    /// light index or array size
+    void updateExtraInfo(size_t data)
+    {
+        if (!mParamsPtr)
+            return;
+
+        mParamsPtr->_setRawAutoConstant(mPhysicalIndex, mAutoConstantType, data, mVariability,
+                                        mElementSize);
+    }
+
 protected:
     // Is it auto constant real based parameter.
     bool mIsAutoConstantReal;
@@ -569,9 +611,11 @@ protected:
     GpuProgramParameters* mParamsPtr;
     // The physical index of this parameter in the GPU program.
     size_t mPhysicalIndex;
+    // The size of this parameter in the GPU program
+    size_t mElementSize;
 };
 
-typedef vector<UniformParameterPtr>::type       UniformParameterList;
+typedef std::vector<UniformParameterPtr>       UniformParameterList;
 typedef UniformParameterList::iterator          UniformParameterIterator;
 typedef UniformParameterList::const_iterator    UniformParameterConstIterator;
 
@@ -642,11 +686,6 @@ public:
     static ParameterPtr createOutTexcoord3(int index, Parameter::Content content);
     static ParameterPtr createInTexcoord4(int index, Parameter::Content content);           
     static ParameterPtr createOutTexcoord4(int index, Parameter::Content content);
-
-    OGRE_DEPRECATED static ParameterPtr createConstParamVector2(Vector2 val) { return createConstParam(val); }
-    OGRE_DEPRECATED static ParameterPtr createConstParamVector3(Vector3 val) { return createConstParam(val); }
-    OGRE_DEPRECATED static ParameterPtr createConstParamVector4(Vector4 val) { return createConstParam(val); }
-    OGRE_DEPRECATED static ParameterPtr createConstParamFloat(float val) { return createConstParam(val); }
 
     static ParameterPtr createConstParam(const Vector2& val);
     static ParameterPtr createConstParam(const Vector3& val);

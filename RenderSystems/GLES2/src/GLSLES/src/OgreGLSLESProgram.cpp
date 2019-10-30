@@ -33,7 +33,7 @@ THE SOFTWARE.
 #include "OgreStringConverter.h"
 #include "OgreGLUtil.h"
 #include "OgreGLES2RenderSystem.h"
-#include "OgreGLES2Support.h"
+#include "OgreGLNativeSupport.h"
 
 #include "OgreGLSLESProgram.h"
 #include "OgreGLSLESProgramManager.h"
@@ -97,6 +97,18 @@ namespace Ogre {
     {
         unloadHighLevelImpl();
     }
+
+    void GLSLESProgram::notifyOnContextReset()
+    {
+        try {
+            compile(true);
+        }
+        catch(Exception& e)
+        {
+            // we already compiled this once, this should not happen
+            LogManager::getSingleton().stream(LML_WARNING) << e.what();
+        }
+    }
 #endif
     GLuint GLSLESProgram::createGLProgramHandle() {
         if(!Root::getSingleton().getRenderSystem()->getCapabilities()->hasCapability(RSC_SEPARATE_SHADER_OBJECTS))
@@ -116,10 +128,6 @@ namespace Ogre {
 
     bool GLSLESProgram::compile(bool checkErrors)
     {
-        if (mCompiled == 1)
-        {
-            return true;
-        }
         // Only create a shader object if glsl es is supported
         if (isSupported())
         {
@@ -143,17 +151,28 @@ namespace Ogre {
             createGLProgramHandle();
         }
 
+        const RenderSystemCapabilities* caps = Root::getSingleton().getRenderSystem()->getCapabilities();
+
         // Add preprocessor extras and main source
         if (!mSource.empty())
         {
-            const RenderSystemCapabilities* caps = Root::getSingleton().getRenderSystem()->getCapabilities();
+            size_t versionPos = mSource.find("#version");
+            int shaderVersion = 100;
+            size_t belowVersionPos = 0;
+
+            if(versionPos != String::npos)
+            {
+                shaderVersion = StringConverter::parseInt(mSource.substr(versionPos+9, 3));
+                belowVersionPos = mSource.find('\n', versionPos) + 1;
+            }
+
+            // insert precision qualifier for improved compatibility
+            if(mType == GPT_FRAGMENT_PROGRAM && mSource.find("precision ") == String::npos)
+                mSource.insert(belowVersionPos, "precision mediump float;\n");
+
             // Fix up the source in case someone forgot to redeclare gl_Position
             if (caps->hasCapability(RSC_GLSL_SSO_REDECLARE) && mType == GPT_VERTEX_PROGRAM)
             {
-                size_t versionPos = mSource.find("#version");
-                int shaderVersion = StringConverter::parseInt(mSource.substr(versionPos+9, 3));
-                size_t belowVersionPos = mSource.find('\n', versionPos) + 1;
-
                 if(shaderVersion >= 300) {
                     // Check that it's missing and that this shader has a main function, ie. not a child shader.
                     if(mSource.find("out highp vec4 gl_Position") == String::npos)
@@ -176,24 +195,32 @@ namespace Ogre {
             OGRE_CHECK_GL_ERROR(glShaderSource(mGLShaderHandle, 1, &source, NULL));
         }
 
-        if (checkErrors)
-            GLSLES::logObjectInfo("GLSL ES compiling: " + mName, mGLShaderHandle);
-
         OGRE_CHECK_GL_ERROR(glCompileShader(mGLShaderHandle));
 
         // Check for compile errors
-        OGRE_CHECK_GL_ERROR(glGetShaderiv(mGLShaderHandle, GL_COMPILE_STATUS, &mCompiled));
-        if(!mCompiled && checkErrors)
+        int compiled;
+        OGRE_CHECK_GL_ERROR(glGetShaderiv(mGLShaderHandle, GL_COMPILE_STATUS, &compiled));
+
+        if(!checkErrors)
+            return compiled == 1;
+
+        if(!compiled && caps->getVendor() == GPU_QUALCOMM)
         {
-            String message = GLSLES::logObjectInfo("GLSL ES compile log: " + mName, mGLShaderHandle);
+            String message = GLSLES::getObjectInfo(mGLShaderHandle);
             checkAndFixInvalidDefaultPrecisionError(message);
+            OGRE_CHECK_GL_ERROR(glGetShaderiv(mGLShaderHandle, GL_COMPILE_STATUS, &compiled));
         }
 
-        // Log a message that the shader compiled successfully.
-        if (mCompiled && checkErrors)
-            GLSLES::logObjectInfo("GLSL ES compiled: " + mName, mGLShaderHandle);
+        String compileInfo = GLSLES::getObjectInfo(mGLShaderHandle);
 
-        return (mCompiled == 1);
+        if (!compiled)
+            OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR, getResourceLogName() + " " + compileInfo, "compile");
+
+        // probably we have warnings
+        if (!compileInfo.empty())
+            LogManager::getSingleton().stream(LML_WARNING) << getResourceLogName() << " " << compileInfo;
+
+        return compiled == 1;
     }
 
 #if !OGRE_NO_GLES2_GLSL_OPTIMISER   
@@ -239,7 +266,6 @@ namespace Ogre {
             
             mGLShaderHandle = 0;
             mGLProgramHandle = 0;
-            mCompiled = 0;
             mLinked = 0;
         }
     }
@@ -298,13 +324,13 @@ namespace Ogre {
     void GLSLESProgram::checkAndFixInvalidDefaultPrecisionError( String &message )
     {
         String precisionQualifierErrorString = ": 'Default Precision Qualifier' : invalid type Type for default precision qualifier can be only float or int";
-        vector< String >::type linesOfSource = StringUtil::split(mSource, "\n");
+        std::vector< String > linesOfSource = StringUtil::split(mSource, "\n");
         if( message.find(precisionQualifierErrorString) != String::npos )
         {
             LogManager::getSingleton().logMessage("Fixing invalid type Type for default precision qualifier by deleting bad lines the re-compiling");
 
             // remove relevant lines from source
-            vector< String >::type errors = StringUtil::split(message, "\n");
+            std::vector< String > errors = StringUtil::split(message, "\n");
 
             // going from the end so when we delete a line the numbers of the lines before will not change
             for(int i = static_cast<int>(errors.size()) - 1 ; i != -1 ; i--)
@@ -346,76 +372,6 @@ namespace Ogre {
                 LogManager::getSingleton().logMessage("The removing of the lines didn't help.");
             }
         }
-    }
-
-    //-----------------------------------------------------------------------------
-    void GLSLESProgram::bindProgram(void)
-    {
-        // Tell the Link Program Manager what shader is to become active
-        switch (mType)
-        {
-            case GPT_VERTEX_PROGRAM:
-                GLSLESProgramManager::getSingleton().setActiveVertexShader( this );
-                break;
-            case GPT_FRAGMENT_PROGRAM:
-                GLSLESProgramManager::getSingleton().setActiveFragmentShader( this );
-                break;
-            case GPT_GEOMETRY_PROGRAM:
-            default:
-                break;
-        }
-    }
-
-    //-----------------------------------------------------------------------------
-    void GLSLESProgram::unbindProgram(void)
-    {
-        // Tell the Link Program Manager what shader is to become inactive
-        if (mType == GPT_VERTEX_PROGRAM)
-        {
-            GLSLESProgramManager::getSingleton().setActiveVertexShader( NULL );
-        }
-        else if (mType == GPT_FRAGMENT_PROGRAM)
-        {
-            GLSLESProgramManager::getSingleton().setActiveFragmentShader( NULL );
-        }
-    }
-
-    //-----------------------------------------------------------------------------
-    void GLSLESProgram::bindProgramParameters(GpuProgramParametersSharedPtr params, uint16 mask)
-    {
-        // Link can throw exceptions, ignore them at this point
-        try
-        {
-            // Activate the link program object
-            GLSLESProgramCommon* linkProgram = GLSLESProgramManager::getSingleton().getActiveProgram();
-            // Pass on parameters from params to program object uniforms
-            linkProgram->updateUniforms(params, mask, mType);
-
-        }
-        catch (Exception& e) {}
-    }
-
-    //-----------------------------------------------------------------------------
-    void GLSLESProgram::bindProgramSharedParameters(GpuProgramParametersSharedPtr params, uint16 mask)
-    {
-        // Link can throw exceptions, ignore them at this point
-        try
-        {
-            // Activate the link program object
-            GLSLESProgramCommon* linkProgram = GLSLESProgramManager::getSingleton().getActiveProgram();
-            // Pass on parameters from params to program object uniforms
-            linkProgram->updateUniformBlocks(params, mask, mType);
-        }
-        catch (Exception& e) {}
-    }
-
-    //-----------------------------------------------------------------------------
-    void GLSLESProgram::bindProgramPassIterationParameters(GpuProgramParametersSharedPtr params)
-    {
-        // Activate the link program object
-        GLSLESProgramCommon* linkProgram = GLSLESProgramManager::getSingleton().getActiveProgram();
-        // Pass on parameters from params to program object uniforms
-        linkProgram->updatePassIterationUniforms( params );
     }
 
     //-----------------------------------------------------------------------------

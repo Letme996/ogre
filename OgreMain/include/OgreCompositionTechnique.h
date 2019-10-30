@@ -66,8 +66,8 @@ namespace Ogre {
             //Texture definition being a reference is determined by these two fields not being empty.
             String refCompName; //If a reference, the name of the compositor being referenced
             String refTexName;  //If a reference, the name of the texture in the compositor being referenced
-            size_t width;       // 0 means adapt to target width
-            size_t height;      // 0 means adapt to target height
+            uint32 width;       // 0 means adapt to target width
+            uint32 height;      // 0 means adapt to target height
             float widthFactor;  // multiple of target width to use (if width = 0)
             float heightFactor; // multiple of target height to use (if height = 0)
             PixelFormatList formatList; // more than one means MRT
@@ -81,9 +81,9 @@ namespace Ogre {
                 fsaa(true), hwGammaWrite(false), depthBufferId(1), pooled(false), scope(TS_LOCAL) {}
         };
         /// Typedefs for several iterators
-        typedef vector<CompositionTargetPass *>::type TargetPasses;
+        typedef std::vector<CompositionTargetPass *> TargetPasses;
         typedef VectorIterator<TargetPasses> TargetPassIterator;
-        typedef vector<TextureDefinition*>::type TextureDefinitions;
+        typedef std::vector<TextureDefinition*> TextureDefinitions;
         typedef VectorIterator<TextureDefinitions> TextureDefinitionIterator;
         
         /** Create a new local texture definition, and return a pointer to it.

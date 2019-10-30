@@ -74,9 +74,8 @@ namespace Ogre
     /// b is the value (from 0 to 27)
     enum Capabilities
     {
-        /// Supports generating mipmaps in hardware
-        /// @deprecated All targetted APIs by Ogre support this feature
-        RSC_AUTOMIPMAP              = OGRE_CAPS_VALUE(CAPS_CATEGORY_COMMON, 0),
+        /// specifying a "-1" in the index buffer starts a new draw command.
+        RSC_PRIMITIVE_RESTART = OGRE_CAPS_VALUE(CAPS_CATEGORY_COMMON, 0),
         /// GL ES2/ES3 does not support generating mipmaps for compressed formats in hardware
         RSC_AUTOMIPMAP_COMPRESSED = OGRE_CAPS_VALUE(CAPS_CATEGORY_COMMON, 1),
         /// Supports anisotropic texture filtering
@@ -84,12 +83,12 @@ namespace Ogre
         /// Supports fixed-function DOT3 texture blend
         /// @deprecated All targetted APIs by Ogre support this feature
         RSC_DOT3                    = OGRE_CAPS_VALUE(CAPS_CATEGORY_COMMON, 3),
-        /// Supports cube mapping
-        RSC_CUBEMAPPING             = OGRE_CAPS_VALUE(CAPS_CATEGORY_COMMON, 4),
+        /// Supports linewidth != 1.0
+        RSC_WIDE_LINES              = OGRE_CAPS_VALUE(CAPS_CATEGORY_COMMON, 4),
         /// Supports hardware stencil buffer
         RSC_HWSTENCIL               = OGRE_CAPS_VALUE(CAPS_CATEGORY_COMMON, 5),
-        /// Supports different texture bindings
-        RSC_COMPLETE_TEXTURE_BINDING = OGRE_CAPS_VALUE(CAPS_CATEGORY_COMMON, 6),
+        /// Supports atomic counter buffers
+        RSC_ATOMIC_COUNTERS         = OGRE_CAPS_VALUE(CAPS_CATEGORY_COMMON, 6),
         /// Supports compressed textures in the ASTC format
         RSC_TEXTURE_COMPRESSION_ASTC = OGRE_CAPS_VALUE(CAPS_CATEGORY_COMMON, 7),
         /// Supports 32bit hardware index buffers
@@ -161,8 +160,8 @@ namespace Ogre
         /// Supports Blending operations other than +
 		/// @deprecated All targetted APIs by Ogre support this feature.
         RSC_ADVANCED_BLEND_OPERATIONS = OGRE_CAPS_VALUE(CAPS_CATEGORY_COMMON_2, 12),
-        /// Supports a separate depth buffer for RTTs. D3D 9 & 10, OGL w/FBO (RSC_FBO implies this flag)
-        RSC_RTT_SEPARATE_DEPTHBUFFER = OGRE_CAPS_VALUE(CAPS_CATEGORY_COMMON_2, 13),
+        /// Supports HW gamma, both in the framebuffer and as texture.
+        RSC_HW_GAMMA = OGRE_CAPS_VALUE(CAPS_CATEGORY_COMMON_2, 13),
         /// Supports using the MAIN depth buffer for RTTs. D3D 9&10, OGL w/FBO support unknown
         /// (undefined behavior?), OGL w/ copy supports it
         RSC_RTT_MAIN_DEPTHBUFFER_ATTACHABLE = OGRE_CAPS_VALUE(CAPS_CATEGORY_COMMON_2, 14),
@@ -187,16 +186,16 @@ namespace Ogre
         RSC_COMPUTE_PROGRAM = OGRE_CAPS_VALUE(CAPS_CATEGORY_COMMON_2, 23),
         /// Supports asynchronous hardware occlusion queries
         RSC_HWOCCLUSION_ASYNCHRONOUS = OGRE_CAPS_VALUE(CAPS_CATEGORY_COMMON_2, 24),
-        /// Supports asynchronous hardware occlusion queries
-        RSC_ATOMIC_COUNTERS = OGRE_CAPS_VALUE(CAPS_CATEGORY_COMMON_2, 25),
-        /// Supports reading back the inactive depth-stencil buffer as texture
-        RSC_READ_BACK_AS_TEXTURE = OGRE_CAPS_VALUE(CAPS_CATEGORY_COMMON_2, 26),
-        /// Supports HW gamma, both in the framebuffer and as texture.
-        RSC_HW_GAMMA = OGRE_CAPS_VALUE(CAPS_CATEGORY_COMMON_2, 27),
 
         // ***** DirectX specific caps *****
         /// Is DirectX feature "per stage constants" supported
         RSC_PERSTAGECONSTANT = OGRE_CAPS_VALUE(CAPS_CATEGORY_D3D9, 0),
+        /// D3D11: supports reading back the inactive depth-stencil buffer as texture
+        RSC_READ_BACK_AS_TEXTURE = OGRE_CAPS_VALUE(CAPS_CATEGORY_D3D9, 1),
+        /// the renderer will try to use W-buffers when available
+        /// W-buffers are enabled by default for 16bit depth buffers and disabled for all other
+        /// depths.
+        RSC_WBUFFER              = OGRE_CAPS_VALUE(CAPS_CATEGORY_D3D9, 2),
 
         // ***** GL Specific Caps *****
         /// Support for PBuffer
@@ -281,7 +280,7 @@ namespace Ogre
 
     public:
 
-        typedef set<String>::type ShaderProfiles;
+        typedef std::set<String> ShaderProfiles;
     private:
         /// This is used to build a database of RSC's
         /// if a RSC with same name, but newer version is introduced, the older one 
@@ -712,7 +711,7 @@ namespace Ogre
             mMaxSupportedAnisotropy = s;
         }
         /// Get the maximum supported anisotropic filtering
-        Real getMaxSupportedAnisotropy()
+        Real getMaxSupportedAnisotropy() const
         {
             return mMaxSupportedAnisotropy;
         }
@@ -733,6 +732,7 @@ namespace Ogre
             mVertexTextureUnitsShared = shared;
         }
         /// Get whether the vertex texture units are shared with the fragment processor
+        /// @deprecated only needed for D3D9
         bool getVertexTextureUnitsShared(void) const
         {
             return mVertexTextureUnitsShared;
@@ -775,7 +775,7 @@ namespace Ogre
 
 
         /** Write the capabilities to the pass in Log */
-        void log(Log* pLog);
+        void log(Log* pLog) const;
 
         // Support for new shader stages in shader model 5.0
         /// The number of floating-point constants tessellation Hull programs support

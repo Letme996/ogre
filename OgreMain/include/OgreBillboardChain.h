@@ -103,7 +103,7 @@ namespace Ogre {
             /// Only used when mFaceCamera == false
             Quaternion orientation;
         };
-        typedef vector<Element>::type ElementList;
+        typedef std::vector<Element> ElementList;
 
         /** Constructor (don't use directly, use factory) 
         @param name The name to give this object
@@ -115,8 +115,8 @@ namespace Ogre {
         */
         BillboardChain(const String& name, size_t maxElements = 20, size_t numberOfChains = 1, 
             bool useTextureCoords = true, bool useColours = true, bool dynamic = true);
-        /// Destructor
-        virtual ~BillboardChain();
+
+        ~BillboardChain();
 
         /** Set the maximum number of chain elements per chain 
         */
@@ -289,9 +289,9 @@ namespace Ogre {
         /// Dynamic use?
         bool mDynamic;
         /// Vertex data
-        VertexData* mVertexData;
+        std::unique_ptr<VertexData> mVertexData;
         /// Index data (to allow multiple unconnected chains)
-        IndexData* mIndexData;
+        std::unique_ptr<IndexData> mIndexData;
         /// Is the vertex declaration dirty?
         bool mVertexDeclDirty;
         /// Do the buffers need recreating?
@@ -341,7 +341,7 @@ namespace Ogre {
             /// The 'tail' of the chain, relative to start
             size_t tail;
         };
-        typedef vector<ChainSegment>::type ChainSegmentList;
+        typedef std::vector<ChainSegment> ChainSegmentList;
         ChainSegmentList mChainSegmentList;
 
         /// Setup the STL collections

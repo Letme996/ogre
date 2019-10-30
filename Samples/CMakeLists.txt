@@ -8,37 +8,28 @@ endif()
 if (OGRE_BUILD_SAMPLES)
   include_directories(${CMAKE_CURRENT_SOURCE_DIR}/Common/include)
 
-  ogre_add_component_include_dir(Bites)
-
   if (OGRE_BUILD_COMPONENT_RTSHADERSYSTEM)
     add_definitions(-DINCLUDE_RTSHADER_SYSTEM)
-    ogre_add_component_include_dir(RTShaderSystem)
   	set(SAMPLE_DEPENDENCIES ${SAMPLE_DEPENDENCIES} OgreRTShaderSystem)
   endif ()
   
   if (OGRE_BUILD_COMPONENT_OVERLAY)
-	  ogre_add_component_include_dir(Overlay)
   	set(SAMPLE_DEPENDENCIES ${SAMPLE_DEPENDENCIES} OgreOverlay)
   endif ()
   
   if (OGRE_BUILD_COMPONENT_TERRAIN)
-    ogre_add_component_include_dir(Terrain)
-    ogre_add_component_include_dir(Paging)
   	set(SAMPLE_DEPENDENCIES ${SAMPLE_DEPENDENCIES} OgreTerrain)
   endif ()
 
   if (OGRE_BUILD_COMPONENT_VOLUME)
-    ogre_add_component_include_dir(Volume)
   	set(SAMPLE_DEPENDENCIES ${SAMPLE_DEPENDENCIES} OgreVolume)
   endif ()
   
   if (OGRE_BUILD_COMPONENT_HLMS)
-	  ogre_add_component_include_dir(HLMS)
   	set(SAMPLE_DEPENDENCIES ${SAMPLE_DEPENDENCIES} OgreHLMS)
   endif ()
   
   if (OGRE_BUILD_COMPONENT_MESHLODGENERATOR AND OGRE_CONFIG_ENABLE_MESHLOD)
-    ogre_add_component_include_dir(MeshLodGenerator)
   	set(SAMPLE_DEPENDENCIES ${SAMPLE_DEPENDENCIES} OgreMeshLodGenerator)
   endif ()
   
@@ -52,18 +43,18 @@ if (OGRE_BUILD_SAMPLES)
   # Find all samples headers, and copy them to a single include folder
   # We do this instead of including every sample in the include_directories directive, 
   # because this creates a list that is too long for the MSVC command line sometimes.
-  file (GLOB SAMPLES_HEADERS ${OGRE_SOURCE_DIR}/Samples/*/include/*.h)
+  file (GLOB SAMPLES_HEADERS ${PROJECT_SOURCE_DIR}/Samples/*/include/*.h)
   foreach(SAMPLE_HEADER_FULLPATH ${SAMPLES_HEADERS})
 	  get_filename_component(SAMPLE_HEADER_NAME ${SAMPLE_HEADER_FULLPATH} NAME)
-	  configure_file(${SAMPLE_HEADER_FULLPATH} ${OGRE_BINARY_DIR}/Samples/include/${SAMPLE_HEADER_NAME} COPYONLY)
+	  configure_file(${SAMPLE_HEADER_FULLPATH} ${PROJECT_BINARY_DIR}/Samples/include/${SAMPLE_HEADER_NAME} COPYONLY)
   endforeach(SAMPLE_HEADER_FULLPATH)
-  include_directories(${OGRE_BINARY_DIR}/Samples/include)
+  include_directories(${PROJECT_BINARY_DIR}/Samples/include)
 
-  file(GLOB SAMPLES_SOURCES ${OGRE_SOURCE_DIR}/Samples/*/src/*.cpp)
+  file(GLOB SAMPLES_SOURCES ${PROJECT_SOURCE_DIR}/Samples/*/src/*.cpp)
 
   set(BLACKLIST AtomicCounters Browser TerrainTessellation PCZTestApp)
   foreach(FILTER_SAMPLE ${BLACKLIST})
-    file(GLOB BLACKLIST_CPP ${OGRE_SOURCE_DIR}/Samples/${FILTER_SAMPLE}/src/*.cpp)
+    file(GLOB BLACKLIST_CPP ${PROJECT_SOURCE_DIR}/Samples/${FILTER_SAMPLE}/src/*.cpp)
     list(REMOVE_ITEM SAMPLES_SOURCES ${BLACKLIST_CPP})
   endforeach()
 
@@ -137,7 +128,7 @@ if (MSVC)
 	# restore
 	set(OGRE_MEDIA_DIR_REL ${OGRE_MEDIA_DIR_TMP})
     add_custom_target(demo_installer 
-	  COMMAND ${Wix_BINARY_DIR}/candle demos.wxs 
+    COMMAND ${Wix_BINARY_DIR}/candle demos.wxs 
 	  COMMAND ${Wix_BINARY_DIR}/light -ext WixUIExtension -cultures:en-us -out OgreDemos_v${OGRE_VERSION_DASH_SEPARATED}.msi demos.wixobj
       WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
       COMMENT "Building demo installer" VERBATIM

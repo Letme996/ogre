@@ -443,15 +443,10 @@ void reorganiseVertexBuffers(const String& desc, Mesh& mesh, SubMesh* sm, Vertex
                         offset = 0;
                         currentBuffer = i->getSource();
                     }
-                    newDecl->addElement(
-                        currentBuffer,
-                        offset,
-                        i->getType(),
-                        i->getSemantic(),
-                        i->getIndex());
-
-                    offset += VertexElement::getTypeSize(i->getType());
-                    
+                    offset += newDecl
+                                  ->addElement(currentBuffer, offset, i->getType(), i->getSemantic(),
+                                               i->getIndex())
+                                  .getSize();
                 }
                 // Usages don't matter here since we're onlly exporting
                 BufferUsageList bufferUsages;
@@ -979,6 +974,18 @@ void resolveColourAmbiguities(Mesh* mesh)
 
 
 }
+
+struct MaterialCreator : public MeshSerializerListener
+{
+    void processMaterialName(Mesh *mesh, String *name)
+    {
+        // create material because we do not load any .material files
+        MaterialManager::getSingleton().create(*name, mesh->getGroup());
+    }
+
+    void processSkeletonName(Mesh *mesh, String *name) {}
+    void processMeshCompleted(Mesh *mesh) {}
+};
 }
 
 int main(int numargs, char** args)
@@ -1000,6 +1007,8 @@ int main(int numargs, char** args)
         matMgr->initialise();
         skelMgr = new SkeletonManager();
         meshSerializer = new MeshSerializer();
+        MaterialCreator matCreator;
+        meshSerializer->setListener(&matCreator);
         skeletonSerializer = new SkeletonSerializer();
         bufferManager = new DefaultHardwareBufferManager(); // needed because we don't have a rendersystem
         meshMgr = new MeshManager();

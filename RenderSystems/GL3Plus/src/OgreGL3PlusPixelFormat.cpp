@@ -69,7 +69,7 @@ namespace Ogre  {
             {GL_NONE},                                           // PF_UNKNOWN
             {GL_RED, GL_UNSIGNED_BYTE, GL_R8},                   // PF_L8
             {GL_RED, GL_UNSIGNED_SHORT, GL_R16},                 // PF_L16
-            {GL_ALPHA, GL_UNSIGNED_BYTE, GL_R8},                 // PF_A8
+            {GL_RED, GL_UNSIGNED_BYTE, GL_R8},                   // PF_A8
             {GL_RG, GL_UNSIGNED_BYTE, GL_RG8},                   // PF_BYTE_LA
             {GL_RGB, GL_UNSIGNED_SHORT_5_6_5, GL_RGB5},          // PF_R5G6B5
             {GL_BGR, GL_UNSIGNED_SHORT_5_6_5, GL_RGB5},          // PF_B5G6R5
@@ -99,7 +99,7 @@ namespace Ogre  {
             {GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, GL_RGBA8},    // PF_X8R8G8B8
             {GL_RGBA, GL_UNSIGNED_INT_8_8_8_8_REV, GL_RGBA8},    // PF_X8B8G8R8
             {GL_RGBA, GL_UNSIGNED_INT_8_8_8_8, GL_RGBA8},        // PF_R8G8B8A8
-            {GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT, GL_DEPTH_COMPONENT16}, // PF_DEPTH
+            {GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT, GL_DEPTH_COMPONENT16}, // PF_DEPTH16
             {GL_RGBA, GL_UNSIGNED_SHORT, GL_RGBA16},             // PF_SHORT_RGBA
             {GL_RGB, GL_UNSIGNED_BYTE_3_3_2, GL_R3_G3_B2},       // PF_R3G3B2
             {GL_RED, GL_HALF_FLOAT, GL_R16F},                    // PF_FLOAT16_R
@@ -178,11 +178,13 @@ namespace Ogre  {
             {GL_NONE, GL_NONE, GL_COMPRESSED_RGBA_ASTC_10x10_KHR},// PF_ASTC_RGBA_10X10_LDR
             {GL_NONE, GL_NONE, GL_COMPRESSED_RGBA_ASTC_12x10_KHR},// PF_ASTC_RGBA_12X10_LDR
             {GL_NONE, GL_NONE, GL_COMPRESSED_RGBA_ASTC_12x12_KHR},// PF_ASTC_RGBA_12X12_LDR
+            {GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, GL_DEPTH_COMPONENT32}, // PF_DEPTH32
+            {GL_DEPTH_COMPONENT, GL_FLOAT, GL_DEPTH_COMPONENT32F}, // PF_DEPTH32F
     };
 
     GLenum GL3PlusPixelUtil::getGLOriginFormat(PixelFormat pf)
     {
-        OgreAssertDbg(sizeof(_pixelFormats)/sizeof(GLPixelFormatDescription) == PF_COUNT, "Did you add a new format?");
+        static_assert(sizeof(_pixelFormats)/sizeof(GLPixelFormatDescription) == PF_COUNT, "Did you add a new format?");
         return _pixelFormats[pf].format;
     }
 
@@ -335,10 +337,12 @@ namespace Ogre  {
         switch(format)
         {
         case GL_DEPTH_COMPONENT24:
-        case GL_DEPTH_COMPONENT32:
-        case GL_DEPTH_COMPONENT32F:
         case GL_DEPTH_COMPONENT:
-            return PF_DEPTH;
+            return PF_DEPTH16;
+        case GL_DEPTH_COMPONENT32:
+            return PF_DEPTH32;
+        case GL_DEPTH_COMPONENT32F:
+            return PF_DEPTH32F;
         case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT1_EXT:
             return PF_DXT1;
         case GL_COMPRESSED_SRGB_ALPHA_S3TC_DXT3_EXT:

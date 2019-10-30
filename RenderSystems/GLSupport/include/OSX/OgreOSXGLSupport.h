@@ -40,14 +40,7 @@ public:
     OSXGLSupport(int profile) : GLNativeSupport(profile) {}
     ~OSXGLSupport() {}
 
-    /**
-    * Add any special config values to the system.
-    * Must have a "Full Screen" value that is a bool and a "Video Mode" value
-    * that is a string in the form of wxh
-    */
-    void addConfig( void );
-
-    NameValuePairList parseOptions(uint& w, uint& h, bool& fullscreen);
+    ConfigOptionMap getConfigOptions();
     
     /// @copydoc RenderSystem::createRenderWindow
     virtual RenderWindow* newWindow( const String &name, unsigned int width, unsigned int height, 
@@ -66,7 +59,7 @@ public:
     /**
     * Get the address of a function
     */
-    void* getProcAddress( const char *name );
+    void* getProcAddress( const char *name ) const;
     
     // Core Foundation Array callback function for sorting, must be static for the function ptr
     static CFComparisonResult _compareModes (const void *val1, const void *val2, void *context);

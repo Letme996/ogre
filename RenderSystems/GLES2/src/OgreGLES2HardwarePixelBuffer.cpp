@@ -41,7 +41,7 @@ THE SOFTWARE.
 #include "OgreGLSLESLinkProgram.h"
 #include "OgreGLSLESProgramPipeline.h"
 #include "OgreBitwise.h"
-#include "OgreGLES2Support.h"
+#include "OgreGLNativeSupport.h"
 #include "OgreGLES2HardwareBuffer.h"
 #include "OgreGLES2Texture.h"
 
@@ -154,10 +154,10 @@ namespace Ogre {
         mSlicePitch = mHeight*mWidth;
         mSizeInBytes = PixelUtil::getMemorySize(mWidth, mHeight, mDepth, mFormat);
 
-#if 0 //OGRE_DEBUG_MODE
+#if OGRE_DEBUG_MODE
         // Log a message
         std::stringstream str;
-        str << "GLES2HardwarePixelBuffer constructed for texture " << baseName
+        str << "GLES2HardwarePixelBuffer constructed for texture " << parent->getName()
             << " id " << mTextureID << " face " << mFace << " level " << mLevel << ":"
             << " width=" << mWidth << " height="<< mHeight << " depth=" << mDepth
             << " format=" << PixelUtil::getFormatName(mFormat);
@@ -653,19 +653,12 @@ namespace Ogre {
 
 #if OGRE_NO_GLES3_SUPPORT == 0
         OGRE_CHECK_GL_ERROR(glTexParameteri(src->mTarget, GL_TEXTURE_BASE_LEVEL, 0));
-
-        // Detach texture from temporary framebuffer
-        if(mFormat == PF_DEPTH)
-        {
-            OGRE_CHECK_GL_ERROR(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
-                                                          GL_RENDERBUFFER, 0));
-        }
-        else
 #endif
-        {
-            OGRE_CHECK_GL_ERROR(glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                                                          GL_RENDERBUFFER, 0));
-        }
+        // Detach texture from temporary framebuffer
+        OGRE_CHECK_GL_ERROR(glFramebufferRenderbuffer(
+            GL_FRAMEBUFFER, PixelUtil::isDepth(mFormat) ? GL_DEPTH_ATTACHMENT : GL_COLOR_ATTACHMENT0,
+            GL_RENDERBUFFER, 0));
+
         // Restore old framebuffer
         OGRE_CHECK_GL_ERROR(glBindFramebuffer(GL_FRAMEBUFFER, oldfb));
         if(tempTex)

@@ -79,27 +79,8 @@ namespace Ogre {
         PF_A8B8G8R8,
         /// 32-bit pixel format, 8 bits for blue, green, red and alpha.
         PF_B8G8R8A8,
-#if OGRE_ENDIAN == OGRE_ENDIAN_BIG
-        /// 3 byte pixel format, 1 byte for red, 1 byte for green, 1 byte for blue
-        PF_BYTE_RGB = PF_R8G8B8,
-        /// 3 byte pixel format, 1 byte for blue, 1 byte for green, 1 byte for red
-        PF_BYTE_BGR = PF_B8G8R8,
-        /// 4 byte pixel format, 1 byte for blue, 1 byte for green, 1 byte for red and one byte for alpha
-        PF_BYTE_BGRA = PF_B8G8R8A8,
-        /// 4 byte pixel format, 1 byte for red, 1 byte for green, 1 byte for blue, and one byte for alpha
-        PF_BYTE_RGBA = PF_R8G8B8A8,
-#else
-        /// 3 byte pixel format, 1 byte for red, 1 byte for green, 1 byte for blue
-        PF_BYTE_RGB = PF_B8G8R8,
-        /// 3 byte pixel format, 1 byte for blue, 1 byte for green, 1 byte for red
-        PF_BYTE_BGR = PF_R8G8B8,
-        /// 4 byte pixel format, 1 byte for blue, 1 byte for green, 1 byte for red and one byte for alpha
-        PF_BYTE_BGRA = PF_A8R8G8B8,
-        /// 4 byte pixel format, 1 byte for red, 1 byte for green, 1 byte for blue, and one byte for alpha
-        PF_BYTE_RGBA = PF_A8B8G8R8,
-#endif        
         /// 32-bit pixel format, 2 bits for alpha, 10 bits for red, green and blue.
-        PF_A2R10G10B10 = PF_B8G8R8A8 + 1, // ensure steady continuing enumeration
+        PF_A2R10G10B10,
         /// 32-bit pixel format, 10 bits for blue, green and red, 2 bits for alpha.
         PF_A2B10G10R10,
         /// DDS (DirectDraw Surface) DXT1 format
@@ -129,7 +110,8 @@ namespace Ogre {
         /// 32-bit pixel format, 8 bits for red, green, blue and alpha.
         PF_R8G8B8A8,
         /// Depth texture format
-        PF_DEPTH,
+        PF_DEPTH16,
+        PF_DEPTH = PF_DEPTH16,
         /// 64-bit pixel format, 16 bits for red, green, blue and alpha
         PF_SHORT_RGBA,
         /// 8-bit pixel format, 2 bits blue, 3 bits green, 3 bits red.
@@ -286,10 +268,33 @@ namespace Ogre {
         PF_ASTC_RGBA_12X10_LDR,
         /// ASTC (ARM Adaptive Scalable Texture Compression RGBA, block size 12x12)
         PF_ASTC_RGBA_12X12_LDR,
+        PF_DEPTH32,
+        /// Depth texture format with 32-bit floating point
+        PF_DEPTH32F,
         /// Number of pixel formats currently defined
-        PF_COUNT
+        PF_COUNT,
+        // endianess aware aliases
+#if OGRE_ENDIAN == OGRE_ENDIAN_BIG
+        /// @copydoc PF_R8G8B8
+        PF_BYTE_RGB = PF_R8G8B8,
+        /// @copydoc PF_B8G8R8
+        PF_BYTE_BGR = PF_B8G8R8,
+        /// @copydoc PF_B8G8R8A8
+        PF_BYTE_BGRA = PF_B8G8R8A8,
+        /// @copydoc PF_R8G8B8A8
+        PF_BYTE_RGBA = PF_R8G8B8A8,
+#else
+        /// @copydoc PF_B8G8R8
+        PF_BYTE_RGB = PF_B8G8R8,
+        /// @copydoc PF_R8G8B8
+        PF_BYTE_BGR = PF_R8G8B8,
+        /// @copydoc PF_A8R8G8B8
+        PF_BYTE_BGRA = PF_A8R8G8B8,
+        /// @copydoc PF_A8B8G8R8
+        PF_BYTE_RGBA = PF_A8B8G8R8,
+#endif
     };
-    typedef vector<PixelFormat>::type PixelFormatList;
+    typedef std::vector<PixelFormat> PixelFormatList;
 
     /**
      * Flags defining some on/off properties of pixel formats
@@ -336,7 +341,7 @@ namespace Ogre {
     class _OgreExport PixelBox: public Box, public ImageAlloc {
     public:
         /// Parameter constructor for setting the members manually
-        PixelBox() {}
+        PixelBox() : data(NULL), format(PF_UNKNOWN) {}
         ~PixelBox() {}
         /** Constructor providing extents in the form of a Box object. This constructor
             assumes the pixel data is laid out consecutively in memory. (this
@@ -530,11 +535,9 @@ namespace Ogre {
         static const String& getFormatName(PixelFormat srcformat);
 
         /** Returns whether the format can be packed or unpacked with the packColour()
-        and unpackColour() functions. This is generally not true for compressed and
-        depth formats as they are special. It can only be true for formats with a
+        and unpackColour() functions. This is generally not true for compressed
+        formats as they are special. It can only be true for formats with a
         fixed element size.
-          @return 
-               true if yes, otherwise false
         */
         static bool isAccessible(PixelFormat srcformat);
         
@@ -557,15 +560,6 @@ namespace Ogre {
             @return                The format match the format name, or PF_UNKNOWN if is invalid name.
         */
         static PixelFormat getFormatFromName(const String& name, bool accessibleOnly = false, bool caseSensitive = false);
-
-        /** Gets the BNF expression of the pixel-formats.
-            @note                   The string returned by this function is intended to be used as a BNF expression
-                                    to work with Compiler2Pass.
-            @param  accessibleOnly  If true, only accessible pixel format will take into account, otherwise all
-                                    pixel formats list in PixelFormat enumeration will being returned.
-            @return                A string contains the BNF expression.
-        */
-        static String getBNFExpressionOfPixelFormats(bool accessibleOnly = false);
 
         /** Returns the similar format but acoording with given bit depths.
             @param fmt      The original foamt.
@@ -636,6 +630,7 @@ namespace Ogre {
             @param  srcFormat   Pixel format of source region
             @param  dst         Pointer to destination region
             @param  dstFormat   Pixel format of destination region
+            @param  count       The number of pixels to convert
          */
         static void bulkPixelConversion(void *src, PixelFormat srcFormat, void *dst, PixelFormat dstFormat, unsigned int count);
 

@@ -40,14 +40,15 @@ namespace Ogre {
     {  
         assert( msSingleton );  return ( *msSingleton );  
     }
-    const String ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME = "General";
-#if OGRE_RESOURCEMANAGER_STRICT
-    const String ResourceGroupManager::INTERNAL_RESOURCE_GROUP_NAME = "OgreInternal";
-    const String ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME = "OgreAutodetect";
-#else
-    const String ResourceGroupManager::INTERNAL_RESOURCE_GROUP_NAME = "Internal";
-    const String ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME = "Autodetect";
-#endif
+
+    const char* const RGN_DEFAULT = "General";
+    const char* const RGN_INTERNAL = "OgreInternal";
+    const char* const RGN_AUTODETECT = "OgreAutodetect";
+
+    const String ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME = RGN_DEFAULT;
+    const String ResourceGroupManager::INTERNAL_RESOURCE_GROUP_NAME = RGN_INTERNAL;
+    const String ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME = RGN_AUTODETECT;
+
     // A reference count of 3 means that only RGM and RM have references
     // RGM has one (this one) and RM has 2 (by name and by handle)
     const long ResourceGroupManager::RESOURCE_SYSTEM_NUM_REFERENCE_COUNTS = 3;
@@ -94,8 +95,7 @@ namespace Ogre {
         grp->worldGeometrySceneManager = 0;
 
         OGRE_LOCK_AUTO_MUTEX;
-        mResourceGroupMap.insert(
-            ResourceGroupMap::value_type(name, grp));
+        mResourceGroupMap.emplace(name, grp);
     }
     //-----------------------------------------------------------------------
     void ResourceGroupManager::initialiseResourceGroup(const String& name)
@@ -650,7 +650,8 @@ namespace Ogre {
     DataStreamPtr ResourceGroupManager::openResourceImpl(const String& resourceName,
                                                      const String& groupName,
                                                      bool searchGroupsIfNotFound,
-                                                     Resource* resourceBeingLoaded) const
+                                                     Resource* resourceBeingLoaded,
+                                                     bool throwOnFailure) const
     {
         OgreAssert(!resourceName.empty(), "resourceName is empty string");
         if(mLoadingListener)
@@ -664,6 +665,9 @@ namespace Ogre {
         ResourceGroup* grp = getResourceGroup(groupName);
         if (!grp)
         {
+            if(!throwOnFailure)
+                return DataStreamPtr();
+
             OGRE_EXCEPT(Exception::ERR_ITEM_NOT_FOUND, 
                 "Cannot locate a resource group called '" + groupName + 
                 "' for resource '" + resourceName + "'" , 
@@ -692,6 +696,9 @@ namespace Ogre {
                 mLoadingListener->resourceStreamOpened(resourceName, groupName, resourceBeingLoaded, stream);
             return stream;
         }
+
+        if(!throwOnFailure)
+            return DataStreamPtr();
 
         OGRE_EXCEPT(Exception::ERR_FILE_NOT_FOUND, "Cannot locate resource " + 
             resourceName + " in resource group " + groupName + ".", 
@@ -901,8 +908,7 @@ namespace Ogre {
     {
             OGRE_LOCK_AUTO_MUTEX;
 
-        mScriptLoaderOrderMap.insert(
-            ScriptLoaderOrderMap::value_type(su->getLoadingOrder(), su));
+        mScriptLoaderOrderMap.emplace(su->getLoadingOrder(), su);
     }
     //-----------------------------------------------------------------------
     void ResourceGroupManager::_unregisterScriptLoader(ScriptLoader* su)
@@ -956,7 +962,7 @@ namespace Ogre {
 
         // Count up the number of scripts we have to parse
         typedef std::pair<ScriptLoader*, FileInfoList> LoaderFileListPair;
-        typedef vector<LoaderFileListPair>::type ScriptLoaderFileList;
+        typedef std::vector<LoaderFileListPair> ScriptLoaderFileList;
         ScriptLoaderFileList scriptLoaderFileList;
         size_t scriptCount = 0;
         // Iterate over script users in loading order and get streams
@@ -1631,6 +1637,7 @@ namespace Ogre {
     std::pair<Archive*, ResourceGroupManager::ResourceGroup*>
     ResourceGroupManager::resourceExistsInAnyGroupImpl(const String& filename) const
     {
+        OgreAssert(!filename.empty(), "resourceName is empty string");
             OGRE_LOCK_AUTO_MUTEX;
 
             // Iterate over resource groups and find
@@ -1819,14 +1826,14 @@ namespace Ogre {
     void ResourceGroupManager::ResourceGroup::addToIndex(const String& filename, Archive* arch)
     {
         // internal, assumes mutex lock has already been obtained
-        this->resourceIndexCaseSensitive[filename] = arch;
+        this->resourceIndexCaseSensitive.emplace(filename, arch);
 
 #if !OGRE_RESOURCEMANAGER_STRICT
         if (!arch->isCaseSensitive())
         {
             String lcase = filename;
             StringUtil::toLowerCase(lcase);
-            this->resourceIndexCaseInsensitive[lcase] = arch;
+            this->resourceIndexCaseInsensitive.emplace(lcase, arch);
         }
 #endif
     }

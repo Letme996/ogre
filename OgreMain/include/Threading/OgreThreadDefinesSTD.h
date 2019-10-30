@@ -26,9 +26,6 @@ THE SOFTWARE
 #ifndef __OgreThreadDefinesSTD_H__
 #define __OgreThreadDefinesSTD_H__
 
-#define OGRE_TOKEN_PASTE(x, y) x ## y
-#define OGRE_TOKEN_PASTE_EXTRA(x, y) OGRE_TOKEN_PASTE(x, y)
-
 // Thread objects and related functions
 #define OGRE_THREAD_TYPE std::thread
 #define OGRE_THREAD_CREATE(name, worker) std::thread* name = OGRE_NEW_T(std::thread, MEMCATEGORY_GENERAL)(worker)
@@ -38,13 +35,13 @@ THE SOFTWARE
 #define OGRE_THREAD_WORKER_INHERIT
 
 #define OGRE_WQ_MUTEX(name) mutable std::recursive_mutex name
-#define OGRE_WQ_LOCK_MUTEX(name) std::unique_lock<std::recursive_mutex> OGRE_TOKEN_PASTE_EXTRA(ogrenameLock, __LINE__) (name)
+#define OGRE_WQ_LOCK_MUTEX(name) std::unique_lock<std::recursive_mutex> OGRE_TOKEN_PASTE(ogrenameLock, __LINE__) (name)
 #define OGRE_WQ_LOCK_MUTEX_NAMED(mutexName, lockName) std::unique_lock<std::recursive_mutex> lockName(mutexName)
 
 // Read-write mutex
 #define OGRE_WQ_RW_MUTEX(name) mutable std::recursive_mutex name
-#define OGRE_WQ_LOCK_RW_MUTEX_READ(name) std::unique_lock<std::recursive_mutex> OGRE_TOKEN_PASTE_EXTRA(ogrenameLock, __LINE__) (name)
-#define OGRE_WQ_LOCK_RW_MUTEX_WRITE(name) std::unique_lock<std::recursive_mutex> OGRE_TOKEN_PASTE_EXTRA(ogrenameLock, __LINE__) (name)
+#define OGRE_WQ_LOCK_RW_MUTEX_READ(name) std::unique_lock<std::recursive_mutex> OGRE_TOKEN_PASTE(ogrenameLock, __LINE__) (name)
+#define OGRE_WQ_LOCK_RW_MUTEX_WRITE(name) std::unique_lock<std::recursive_mutex> OGRE_TOKEN_PASTE(ogrenameLock, __LINE__) (name)
 
 #define OGRE_WQ_THREAD_SYNCHRONISER(sync) std::condition_variable_any sync
 #define OGRE_THREAD_WAIT(sync, mutex, lock) sync.wait(lock)
@@ -52,61 +49,6 @@ THE SOFTWARE
 #define OGRE_THREAD_NOTIFY_ALL(sync) sync.notify_all()
 
 #if OGRE_THREAD_SUPPORT != 3
-namespace Ogre
-{
-    /// wrapper around `thread_local std::unique_ptr<T>`
-    /// that can be used as a class member
-    template< typename T > class ThreadLocalPtr
-    {
-    private:
-
-        ThreadLocalPtr(const ThreadLocalPtr&) = delete;
-        ThreadLocalPtr& operator = (const ThreadLocalPtr&) = delete;
-
-        std::vector< std::unique_ptr<T> >& _getVect() const
-        {
-            thread_local std::vector< std::unique_ptr<T> > locals;
-            return locals;
-        }
-
-        std::unique_ptr<T>& _get() const
-        {
-            return *std::next(std::begin(_getVect()), m_LocalID);
-        }
-    public:
-        ThreadLocalPtr() : m_LocalID(m_VarCounter++) {}
-
-        inline void reset(T* a = 0)
-        {
-            auto& vect = _getVect();
-            if (vect.size() <= m_LocalID)
-                vect.resize(m_LocalID + 1);
-            _get().reset(a);
-        }
-
-        inline T* get() const
-        {
-            return _get().get();
-        }
-
-        inline T* operator->() const
-        {
-            return _get().get();
-        }
-
-        inline T& operator*() const
-        {
-            return *_get();
-        }
-
-        static thread_local std::size_t m_VarCounter;
-        const std::size_t m_LocalID;
-    };
-
-    template< typename T >
-    thread_local std::size_t ThreadLocalPtr<T>::m_VarCounter = 0;
-}
-
 #define OGRE_LOCK_AUTO_MUTEX std::unique_lock<std::recursive_mutex> ogreAutoMutexLock(OGRE_AUTO_MUTEX_NAME)
 #define OGRE_THREAD_SLEEP(ms) std::this_thread::sleep_for(std::chrono::milliseconds(ms))
 
@@ -121,14 +63,6 @@ namespace Ogre
 #define OGRE_COPY_AUTO_SHARED_MUTEX(from) assert(!OGRE_AUTO_MUTEX_NAME); OGRE_AUTO_MUTEX_NAME = from
 #define OGRE_SET_AUTO_SHARED_MUTEX_NULL OGRE_AUTO_MUTEX_NAME = 0
 #define OGRE_MUTEX_CONDITIONAL(mutex) if (mutex)
-
-// Thread-local pointer
-#define OGRE_THREAD_POINTER(T, var) Ogre::ThreadLocalPtr<T> var
-#define OGRE_THREAD_POINTER_INIT(var) var()
-#define OGRE_THREAD_POINTER_VAR(T, var) Ogre::ThreadLocalPtr<T> var ()
-#define OGRE_THREAD_POINTER_SET(var, expr) var.reset(expr)
-#define OGRE_THREAD_POINTER_GET(var) var.get()
-#define OGRE_THREAD_POINTER_DELETE(var) var.reset(0)
 
 // Utility
 #define OGRE_THREAD_ID_TYPE std::thread::id

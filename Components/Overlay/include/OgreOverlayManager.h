@@ -33,6 +33,7 @@ THE SOFTWARE.
 #include "OgreStringVector.h"
 #include "OgreScriptLoader.h"
 #include "OgreFrustum.h"
+#include "OgreScriptTranslator.h"
 
 namespace Ogre {
     class Overlay;
@@ -54,24 +55,18 @@ namespace Ogre {
     class _OgreOverlayExport OverlayManager : public Singleton<OverlayManager>, public ScriptLoader, public OverlayAlloc
     {
     public:
-        typedef map<String, Overlay*>::type OverlayMap;
-        typedef map<String, OverlayElement*>::type ElementMap;
-        typedef map<String, OverlayElementFactory*>::type FactoryMap;
+        typedef std::map<String, Overlay*> OverlayMap;
+        typedef std::map<String, OverlayElement*> ElementMap;
+        typedef std::map<String, OverlayElementFactory*> FactoryMap;
     protected:
         OverlayMap mOverlayMap;
         StringVector mScriptPatterns;
 
-        void parseNewElement( DataStreamPtr& chunk, String& elemType, String& elemName, 
-            bool isContainer, Overlay* pOverlay, bool isTemplate, String templateName = String(""), OverlayContainer* container = 0);
-        void parseAttrib( const String& line, Overlay* pOverlay);
-        void parseElementAttrib( const String& line, Overlay* pOverlay, OverlayElement* pElement );
-        void skipToNextCloseBrace(DataStreamPtr& chunk);
-        void skipToNextOpenBrace(DataStreamPtr& chunk);
-
         int mLastViewportWidth, mLastViewportHeight;
         OrientationMode mLastViewportOrientationMode;
+        float mPixelRatio;
 
-        bool parseChildren( DataStreamPtr& chunk, const String& line,
+        bool parseChildren( DataStreamPtr& chunk, const String& line, int& l,
             Overlay* pOverlay, bool isTemplate, OverlayContainer* parent = NULL);
 
         FactoryMap mFactories;
@@ -79,11 +74,7 @@ namespace Ogre {
         ElementMap mInstances;
         ElementMap mTemplates;
 
-        typedef set<String>::type LoadedScripts;
-        LoadedScripts mLoadedScripts;
-
-
-
+        std::unique_ptr<ScriptTranslatorManager> mTranslatorManager;
 
         ElementMap& getElementMap(bool isTemplate);
 
@@ -115,6 +106,8 @@ namespace Ogre {
         /// @copydoc ScriptLoader::getLoadingOrder
         Real getLoadingOrder(void) const;
 
+        void addOverlay(Overlay* overlay);
+
         /** Create a new Overlay. */
         Overlay* create(const String& name);
         /** Retrieve an Overlay by name 
@@ -142,6 +135,13 @@ namespace Ogre {
 
         /** Gets the orientation mode of the destination viewport. */
         OrientationMode getViewportOrientationMode(void) const;
+
+       /** Sets the pixel ratio: how many viewport pixels represent a single overlay pixel (in one dimension).
+
+       By default this is an 1:1 mapping. However on HiDPI screens you want to increase that to scale up your Overlay.
+       @see RenderWindow::getViewPointToPixelScale */
+       void setPixelRatio(float ratio);
+       float getPixelRatio() const;
 
         /** Creates a new OverlayElement of the type requested.
         @remarks

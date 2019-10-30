@@ -31,6 +31,7 @@ THE SOFTWARE.
 #include "OgrePrerequisites.h"
 #include "OgreIteratorWrappers.h"
 #include "OgreHeaderPrefix.h"
+#include "OgreCompositionPass.h"
 
 namespace Ogre {
     /** \addtogroup Core
@@ -55,7 +56,7 @@ namespace Ogre {
             IM_NONE,        /// No input
             IM_PREVIOUS     /// Output of previous Composition in chain
         };
-        typedef vector<CompositionPass *>::type Passes;
+        typedef std::vector<CompositionPass *> Passes;
         typedef VectorIterator<Passes> PassIterator;
         
         /** Set input mode of this TargetPass
@@ -121,7 +122,7 @@ namespace Ogre {
         
         /** Create a new pass, and return a pointer to it.
         */
-        CompositionPass *createPass();
+        CompositionPass *createPass(CompositionPass::PassType type = CompositionPass::PT_RENDERQUAD);
         /** Remove a pass. It will also be destroyed.
         */
         void removePass(size_t idx);

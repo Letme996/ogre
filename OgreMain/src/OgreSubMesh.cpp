@@ -34,7 +34,6 @@ namespace Ogre {
         , operationType(RenderOperation::OT_TRIANGLE_LIST)
         , vertexData(0)
         , parent(0)
-        , mMatInitialised(false)
         , mBoneAssignmentsOutOfDate(false)
         , mVertexAnimationType(VAT_NONE)
         , mVertexAnimationIncludesNormals(false)
@@ -53,19 +52,12 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void SubMesh::setMaterialName( const String& name, const String& groupName /* = ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME */)
     {
-        mMaterialName = name;
-        mMatInitialised = true;
+        mMaterial = MaterialManager::getSingleton().getByName(name, groupName);
     }
     //-----------------------------------------------------------------------
     const String& SubMesh::getMaterialName() const
     {
-        return mMaterialName;
-    }
-    //-----------------------------------------------------------------------
-    bool SubMesh::isMatInitialised(void) const
-    {
-        return mMatInitialised;
-
+        return mMaterial ? mMaterial->getName() : BLANKSTRING;
     }
     //-----------------------------------------------------------------------
     void SubMesh::_getRenderOperation(RenderOperation& ro, ushort lodIndex)
@@ -92,8 +84,7 @@ namespace Ogre {
             OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "This SubMesh uses shared geometry,  you "
                 "must assign bones to the Mesh, not the SubMesh", "SubMesh.addBoneAssignment");
         }
-        mBoneAssignments.insert(
-            VertexBoneAssignmentList::value_type(vertBoneAssign.vertexIndex, vertBoneAssign));
+        mBoneAssignments.emplace(vertBoneAssign.vertexIndex, vertBoneAssign);
         mBoneAssignmentsOutOfDate = true;
     }
     //-----------------------------------------------------------------------
@@ -149,15 +140,13 @@ namespace Ogre {
     {
         bool newMaterialCreated = false;
         // if submesh has texture aliases
-        // ask the material manager if the current summesh material exists
-        if (hasTextureAliases() &&
-            MaterialManager::getSingleton().resourceExists(
-                mMaterialName, ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME))
+        // ask the material manager if the current submesh material exists
+        if (hasTextureAliases() && mMaterial)
         {
             // get the current submesh material
-            MaterialPtr material = MaterialManager::getSingleton().getByName( mMaterialName );
+            const String& materialName = mMaterial->getName();
             // get test result for if change will occur when the texture aliases are applied
-            if (material->applyTextureAliases(mTextureAliases, false))
+            if (mMaterial->applyTextureAliases(mTextureAliases, false))
             {
                 Ogre::String newMaterialName;
 
@@ -165,11 +154,11 @@ namespace Ogre {
                 // due to aliasing, let's strip off the aliasing suffix and
                 // generate a new one using our current aliasing table.
 
-                Ogre::String::size_type pos = mMaterialName.find("?TexAlias(", 0);
+                Ogre::String::size_type pos = materialName.find("?TexAlias(", 0);
                 if( pos != Ogre::String::npos )
-                    newMaterialName = mMaterialName.substr(0, pos);
+                    newMaterialName = materialName.substr(0, pos);
                 else
-                    newMaterialName = mMaterialName;
+                    newMaterialName = materialName;
 
                 newMaterialName += "?TexAlias(";
                 // Iterate deterministically over the aliases (always in the same
@@ -186,17 +175,15 @@ namespace Ogre {
                     
                 // Reuse the material if it's already been created. This decreases batch
                 // count and keeps material explosion under control.
-                if(!MaterialManager::getSingleton().resourceExists(newMaterialName, material->getGroup()))
+                MaterialPtr newMaterial = MaterialManager::getSingleton().getByName(newMaterialName, mMaterial->getGroup());
+                if(!newMaterial)
                 {
-                    Ogre::MaterialPtr newMaterial = Ogre::MaterialManager::getSingleton().create(
-                        newMaterialName, material->getGroup());
-                    // copy parent material details to new material
-                    material->copyDetailsTo(newMaterial);
+                    newMaterial = mMaterial->clone(newMaterialName);
                     // apply texture aliases to new material
                     newMaterial->applyTextureAliases(mTextureAliases);
                 }
                 // place new material name in submesh
-                setMaterialName(newMaterialName);
+                mMaterial = newMaterial;
                 newMaterialCreated = true;
             }
         }
@@ -236,7 +223,7 @@ namespace Ogre {
     struct Cluster
     {
         Vector3 mMin, mMax;
-        set<uint32>::type mIndices;
+        std::set<uint32> mIndices;
 
         Cluster ()
         { }
@@ -270,7 +257,7 @@ namespace Ogre {
             mMin.x = mMin.y = mMin.z = Math::POS_INFINITY;
             mMax.x = mMax.y = mMax.z = Math::NEG_INFINITY;
 
-            for (set<uint32>::type::const_iterator i = mIndices.begin ();
+            for (std::set<uint32>::const_iterator i = mIndices.begin ();
                  i != mIndices.end (); ++i)
             {
                 float *v;
@@ -286,7 +273,7 @@ namespace Ogre {
             Cluster newbox;
 
             // Separate all points that are inside the new bbox
-            for (set<uint32>::type::iterator i = mIndices.begin ();
+            for (std::set<uint32>::iterator i = mIndices.begin ();
                  i != mIndices.end (); )
             {
                 float *v;
@@ -294,7 +281,7 @@ namespace Ogre {
                 if (v [split_axis] > r)
                 {
                     newbox.mIndices.insert (*i);
-                    set<uint32>::type::iterator x = i++;
+                    std::set<uint32>::iterator x = i++;
                     mIndices.erase(x);
                 }
                 else
@@ -330,7 +317,7 @@ namespace Ogre {
         uint8 *vdata = (uint8 *)vbuf->lock (HardwareBuffer::HBL_READ_ONLY);
         size_t vsz = vbuf->getVertexSize ();
 
-        vector<Cluster>::type boxes;
+        std::vector<Cluster> boxes;
         boxes.reserve (count);
 
         // First of all, find min and max bounding box of the submesh
@@ -374,7 +361,7 @@ namespace Ogre {
             // Find the largest box with more than one vertex :)
             Cluster *split_box = NULL;
             Real split_volume = -1;
-            for (vector<Cluster>::type::iterator b = boxes.begin ();
+            for (std::vector<Cluster>::iterator b = boxes.begin ();
                  b != boxes.end (); ++b)
             {
                 if (b->empty ())
@@ -410,13 +397,13 @@ namespace Ogre {
 
         // Fine, now from every cluster choose the vertex that is most
         // distant from the geometrical center and from other extremes.
-        for (vector<Cluster>::type::const_iterator b = boxes.begin ();
+        for (std::vector<Cluster>::const_iterator b = boxes.begin ();
              b != boxes.end (); ++b)
         {
             Real rating = 0;
             Vector3 best_vertex;
 
-            for (set<uint32>::type::const_iterator i = b->mIndices.begin ();
+            for (std::set<uint32>::const_iterator i = b->mIndices.begin ();
                  i != b->mIndices.end (); ++i)
             {
                 float *v;
@@ -425,7 +412,7 @@ namespace Ogre {
                 Vector3 vv (v [0], v [1], v [2]);
                 Real r = (vv - center).squaredLength ();
 
-                for (vector<Vector3>::type::const_iterator e = extremityPoints.begin ();
+                for (std::vector<Vector3>::const_iterator e = extremityPoints.begin ();
                      e != extremityPoints.end (); ++e)
                     r += (*e - vv).squaredLength ();
                 if (r > rating)
@@ -463,8 +450,7 @@ namespace Ogre {
         HardwareBufferManagerBase* bufferManager = parentMesh->getHardwareBufferManager();
         SubMesh* newSub = parentMesh->createSubMesh(newName);
 
-        newSub->mMaterialName = this->mMaterialName;
-        newSub->mMatInitialised = this->mMatInitialised;
+        newSub->mMaterial = this->mMaterial;
         newSub->operationType = this->operationType;
         newSub->useSharedVertices = this->useSharedVertices;
         newSub->extremityPoints = this->extremityPoints;

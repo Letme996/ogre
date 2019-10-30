@@ -36,6 +36,12 @@ THE SOFTWARE.
 #include <zzip/zzip.h>
 #include <zzip/plugin.h>
 
+#ifdef _OGRE_FILESYSTEM_ARCHIVE_UNICODE
+#   define WIN32_LEAN_AND_MEAN
+#   include <windows.h>
+#   include <stringapiset.h>
+#endif
+
 namespace Ogre {
 namespace {
     class ZipArchive : public Archive
@@ -43,19 +49,17 @@ namespace {
     protected:
         /// Handle to root zip file
         ZZIP_DIR* mZzipDir;
-        /// Handle any errors from zzip
-        void checkZzipError(int zzipError, const String& operation) const;
         /// File list (since zziplib seems to only allow scanning of dir tree once)
         FileInfoList mFileList;
         /// A pointer to file io alternative implementation
-        zzip_plugin_io_handlers* mPluginIo;
+        const zzip_plugin_io_handlers* mPluginIo;
 
         OGRE_AUTO_MUTEX;
     public:
-        ZipArchive(const String& name, const String& archType, zzip_plugin_io_handlers* pluginIo = NULL);
+        ZipArchive(const String& name, const String& archType, const zzip_plugin_io_handlers* pluginIo);
         ~ZipArchive();
         /// @copydoc Archive::isCaseSensitive
-        bool isCaseSensitive(void) const { return OGRE_RESOURCEMANAGER_STRICT; }
+        bool isCaseSensitive(void) const { return OGRE_RESOURCEMANAGER_STRICT != 0; }
 
         /// @copydoc Archive::load
         void load();
@@ -120,50 +124,83 @@ namespace {
     };
 
     /// Utility method to format out zzip errors
-    String getZzipErrorDescription(zzip_error_t zzipError)
+    static String getErrorDescription(zzip_error_t zzipError, const String& file)
     {
-        String errorMsg;
+        const char* errorMsg = "";
         switch (zzipError)
         {
         case ZZIP_NO_ERROR:
             break;
         case ZZIP_OUTOFMEM:
-            errorMsg = "Out of memory.";
+            errorMsg = "Out of memory";
             break;            
         case ZZIP_DIR_OPEN:
+            errorMsg = "Unable to open zip file";
+            break;
         case ZZIP_DIR_STAT: 
         case ZZIP_DIR_SEEK:
         case ZZIP_DIR_READ:
-            errorMsg = "Unable to read zip file.";
+            errorMsg = "Unable to read zip file";
             break;            
         case ZZIP_UNSUPP_COMPR:
-            errorMsg = "Unsupported compression format.";
+            errorMsg = "Unsupported compression format";
             break;            
         case ZZIP_CORRUPTED:
-            errorMsg = "Corrupted archive.";
+            errorMsg = "Corrupted archive";
             break;
         case ZZIP_DIR_TOO_SHORT:
-            errorMsg = "Zip file is too short.";
+            errorMsg = "Zip file is too short";
             break;
         case ZZIP_DIR_EDH_MISSING:
-            errorMsg = "Zip-file's central directory record missing. Is this a 7z file?";
+            errorMsg = "Zip-file's central directory record missing. Is this a 7z file";
             break;
         case ZZIP_ENOENT:
-            errorMsg = "File not in archive.";
+            errorMsg = "File not in archive";
             break;
         default:
-            errorMsg = "Unknown error.";
+            errorMsg = "Unknown error";
             break;            
         };
 
-        return errorMsg;
+        return StringUtil::format("%s '%s'", errorMsg, file.c_str());
     }
 
-    /// A static pointer to file io alternative implementation for the embedded files
-    zzip_plugin_io_handlers* gPluginIo = NULL;
+#ifdef _OGRE_FILESYSTEM_ARCHIVE_UNICODE
+    int wopen_wrapper(const char* filename, int oflag, ...)
+    {
+        int utf16Length = ::MultiByteToWideChar(CP_UTF8, 0, filename, (int)strlen(filename), NULL, 0);
+        if (utf16Length > 0)
+        {
+            std::wstring wt;
+            wt.resize(utf16Length);
+            if (0 != ::MultiByteToWideChar(CP_UTF8, 0, filename, (int)strlen(filename), &wt[0],
+                                           (int)wt.size()))
+                return _wopen(wt.c_str(), oflag);
+        }
+
+        return -1;
+    }
+#endif
+
+    const zzip_plugin_io_handlers* getDefaultIO()
+    {
+        static zzip_plugin_io_handlers defaultIO;
+        static bool isInit = false;
+
+        if (!isInit)
+        {
+            zzip_init_io(&defaultIO, 1);
+#ifdef _OGRE_FILESYSTEM_ARCHIVE_UNICODE
+            defaultIO.fd.open = wopen_wrapper;
+#endif
+            isInit = true;
+        }
+
+        return &defaultIO;
+    }
 }
     //-----------------------------------------------------------------------
-    ZipArchive::ZipArchive(const String& name, const String& archType, zzip_plugin_io_handlers* pluginIo)
+    ZipArchive::ZipArchive(const String& name, const String& archType, const zzip_plugin_io_handlers* pluginIo)
         : Archive(name, archType), mZzipDir(0), mPluginIo(pluginIo)
     {
     }
@@ -180,7 +217,8 @@ namespace {
         {
             zzip_error_t zzipError;
             mZzipDir = zzip_dir_open_ext_io(mName.c_str(), &zzipError, 0, mPluginIo);
-            checkZzipError(zzipError, "opening archive");
+            if (zzipError)
+                OGRE_EXCEPT(Exception::ERR_INTERNAL_ERROR, getErrorDescription(zzipError, mName));
 
             // Cache names
             ZZIP_DIRENT zzipEntry;
@@ -261,11 +299,7 @@ namespace {
 
         if (!zzipFile)
         {
-            int zerr = zzip_error(mZzipDir);
-            String zzDesc = getZzipErrorDescription((zzip_error_t)zerr);
-
-            OGRE_EXCEPT(Exception::ERR_FILE_NOT_FOUND,
-                    mName+ " Cannot open file: " + lookUpFileName + " - "+zzDesc, "ZipArchive::open");
+            OGRE_EXCEPT(Exception::ERR_FILE_NOT_FOUND, getErrorDescription((zzip_error_t)zzip_error(mZzipDir), mName));
         }
 
         // Get uncompressed size too
@@ -405,20 +439,6 @@ namespace {
 
     }
     //-----------------------------------------------------------------------
-    void ZipArchive::checkZzipError(int zzipError, const String& operation) const
-    {
-        if (zzipError != ZZIP_NO_ERROR)
-        {
-            String errorMsg = getZzipErrorDescription(static_cast<zzip_error_t>(zzipError));
-
-            OGRE_EXCEPT(Exception::ERR_INTERNAL_ERROR, 
-                mName + " - error whilst " + operation + ": " + errorMsg,
-                "ZipArchive::checkZzipError");
-        }
-    }
-    //-----------------------------------------------------------------------
-    //-----------------------------------------------------------------------
-    //-----------------------------------------------------------------------
     ZipDataStream::ZipDataStream(const String& name, ZZIP_FILE* zzipFile, size_t uncompressedSize)
         :DataStream(name), mZzipFile(zzipFile)
     {
@@ -502,6 +522,7 @@ namespace {
     //-----------------------------------------------------------------------
     void ZipDataStream::close(void)
     {
+        mAccess = 0;
         if (mZzipFile != 0)
         {
             zzip_file_close(mZzipFile);
@@ -510,7 +531,6 @@ namespace {
         mCache.clear();
     }
     //-----------------------------------------------------------------------
-    //-----------------------------------------------------------------------
     //  ZipArchiveFactory
     //-----------------------------------------------------------------------
     Archive *ZipArchiveFactory::createInstance( const String& name, bool readOnly )
@@ -518,7 +538,7 @@ namespace {
         if(!readOnly)
             return NULL;
 
-        return OGRE_NEW ZipArchive(name, getType());
+        return OGRE_NEW ZipArchive(name, getType(), getDefaultIO());
     }
     //-----------------------------------------------------------------------
     const String& ZipArchiveFactory::getType(void) const
@@ -542,17 +562,16 @@ namespace {
     };
     //-----------------------------------------------------------------------
     /// A type for a map between the file names to file index
-    typedef map<String, int>::type FileNameToIndexMap;
+    typedef std::map<String, int> FileNameToIndexMap;
     typedef FileNameToIndexMap::iterator FileNameToIndexMapIter;
     /// A type to store the embedded files data
-    typedef vector<EmbeddedFileData>::type EmbbedFileDataList;
+    typedef std::vector<EmbeddedFileData> EmbbedFileDataList;
 
     namespace {
     /// A static map between the file names to file index
     FileNameToIndexMap * EmbeddedZipArchiveFactory_mFileNameToIndexMap;
     /// A static list to store the embedded files data
     EmbbedFileDataList * EmbeddedZipArchiveFactory_mEmbbedFileDataList;
-    _zzip_plugin_io sEmbeddedZipArchiveFactory_PluginIo;
     #define EMBED_IO_BAD_FILE_HANDLE (-1)
     #define EMBED_IO_SUCCESS (0)
     //-----------------------------------------------------------------------
@@ -712,32 +731,25 @@ namespace {
         // the files in this case are read only - return an error  - nonzero value.
         return -1;
     }
+
+    /// A static pointer to file io alternative implementation for the embedded files
+    const zzip_plugin_io_handlers* getEmbeddedZipIO()
+    {
+        static zzip_plugin_io_handlers embeddedZipIO = {
+            {EmbeddedZipArchiveFactory_open, EmbeddedZipArchiveFactory_close,
+             EmbeddedZipArchiveFactory_read, EmbeddedZipArchiveFactory_seeks,
+             EmbeddedZipArchiveFactory_filesize, 1, 1, EmbeddedZipArchiveFactory_write}};
+        return &embeddedZipIO;
+    }
+
     } // namespace {
     //-----------------------------------------------------------------------
-    EmbeddedZipArchiveFactory::EmbeddedZipArchiveFactory()
-    {
-        // init static member
-        if (gPluginIo == NULL)
-        {
-            gPluginIo = &sEmbeddedZipArchiveFactory_PluginIo;
-            gPluginIo->fd.open = EmbeddedZipArchiveFactory_open;
-            gPluginIo->fd.close = EmbeddedZipArchiveFactory_close;
-            gPluginIo->fd.read = EmbeddedZipArchiveFactory_read;
-            gPluginIo->fd.seeks = EmbeddedZipArchiveFactory_seeks;
-            gPluginIo->fd.filesize = EmbeddedZipArchiveFactory_filesize;
-            gPluginIo->fd.write = EmbeddedZipArchiveFactory_write;
-            gPluginIo->fd.sys = 1;
-            gPluginIo->fd.type = 1;
-        }
-    }
-    //-----------------------------------------------------------------------
-    EmbeddedZipArchiveFactory::~EmbeddedZipArchiveFactory()
-    {
-    }
+    EmbeddedZipArchiveFactory::EmbeddedZipArchiveFactory() {}
+    EmbeddedZipArchiveFactory::~EmbeddedZipArchiveFactory() {}
     //-----------------------------------------------------------------------
     Archive *EmbeddedZipArchiveFactory::createInstance( const String& name, bool readOnly )
     {
-        ZipArchive * resZipArchive = OGRE_NEW ZipArchive(name, getType(), gPluginIo);
+        ZipArchive * resZipArchive = OGRE_NEW ZipArchive(name, getType(), getEmbeddedZipIO());
         return resZipArchive;
     }
     //-----------------------------------------------------------------------

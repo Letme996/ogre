@@ -38,16 +38,8 @@ namespace Ogre
     {
     public:
         Win32GLSupport(int profile);
-        /**
-        * Add any special config values to the system.
-        * Must have a "Full Screen" value that is a bool and a "Video Mode" value
-        * that is a string in the form of wxhxb
-        */
-        void addConfig();
-
-        void setConfigOption(const String &name, const String &value);
-
-        NameValuePairList parseOptions(uint& w, uint& h, bool& fullscreen);
+        
+        ConfigOptionMap getConfigOptions();
         
         /// @copydoc RenderSystem::_createRenderWindow
         virtual RenderWindow* newWindow(const String &name, unsigned int width, unsigned int height, 
@@ -66,7 +58,7 @@ namespace Ogre
         /**
         * Get the address of a function
         */
-        void* getProcAddress(const char* procname);
+        void* getProcAddress(const char* procname) const;
 
         /**
          * Initialise extensions
@@ -78,10 +70,7 @@ namespace Ogre
 
         virtual unsigned int getDisplayMonitorCount() const;
     private:
-        // Allowed video modes
-        vector<DEVMODE>::type mDevModes;
         Win32Window *mInitialWindow;
-        vector<int>::type mFSAALevels;
         bool mHasPixelFormatARB;
         bool mHasMultisample;
         bool mHasHardwareGamma;
@@ -93,12 +82,11 @@ namespace Ogre
             MONITORINFOEX   monitorInfoEx;
         };
 
-        typedef vector<DisplayMonitorInfo>::type DisplayMonitorInfoList;
+        typedef std::vector<DisplayMonitorInfo> DisplayMonitorInfoList;
         typedef DisplayMonitorInfoList::iterator DisplayMonitorInfoIterator;
 
         DisplayMonitorInfoList mMonitorInfoList;
 
-        void refreshConfig();
         void initialiseWGL();
         static LRESULT CALLBACK dummyWndProc(HWND hwnd, UINT umsg, WPARAM wp, LPARAM lp);
         static BOOL CALLBACK sCreateMonitorsInfoEnumProc(HMONITOR hMonitor, HDC hdcMonitor, 

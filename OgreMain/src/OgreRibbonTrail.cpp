@@ -119,7 +119,7 @@ namespace Ogre
         return i->second;
     }
     //-----------------------------------------------------------------------
-    void RibbonTrail::removeNode(Node* n)
+    void RibbonTrail::removeNode(const Node* n)
     {
         NodeList::iterator i = std::find(mNodeList.begin(), mNodeList.end(), n);
         if (i != mNodeList.end())
@@ -132,7 +132,7 @@ namespace Ogre
             BillboardChain::clearChain(chainIndex);
             // mark as free now
             mFreeChains.push_back(chainIndex);
-            n->setListener(0);
+            (*i)->setListener(0);
             mNodeList.erase(i);
             mNodeToChainSegment.erase(mi);
             mNodeToSegMap.erase(mNodeToSegMap.find(n));
@@ -218,7 +218,7 @@ namespace Ogre
         setInitialColour(chainIndex, col.r, col.g, col.b, col.a);
     }
     //-----------------------------------------------------------------------
-    void RibbonTrail::setInitialColour(size_t chainIndex, Real r, Real g, Real b, Real a)
+    void RibbonTrail::setInitialColour(size_t chainIndex, float r, float g, float b, float a)
     {
         if (chainIndex >= mChainCount)
         {
@@ -267,7 +267,7 @@ namespace Ogre
             valuePerSecond.r, valuePerSecond.g, valuePerSecond.b, valuePerSecond.a);
     }
     //-----------------------------------------------------------------------
-    void RibbonTrail::setColourChange(size_t chainIndex, Real r, Real g, Real b, Real a)
+    void RibbonTrail::setColourChange(size_t chainIndex, float r, float g, float b, float a)
     {
         if (chainIndex >= mChainCount)
         {
@@ -349,7 +349,7 @@ namespace Ogre
     //-----------------------------------------------------------------------
     void RibbonTrail::nodeDestroyed(const Node* node)
     {
-        removeNode(const_cast<Node*>(node));
+        removeNode(node);
 
     }
     //-----------------------------------------------------------------------
@@ -520,12 +520,12 @@ namespace Ogre
             NameValuePairList::const_iterator ni = params->find("maxElements");
             if (ni != params->end())
             {
-                maxElements = StringConverter::parseUnsignedLong(ni->second);
+                maxElements = StringConverter::parseSizeT(ni->second);
             }
             ni = params->find("numberOfChains");
             if (ni != params->end())
             {
-                numberOfChains = StringConverter::parseUnsignedLong(ni->second);
+                numberOfChains = StringConverter::parseSizeT(ni->second);
             }
             ni = params->find("useTextureCoords");
             if (ni != params->end())

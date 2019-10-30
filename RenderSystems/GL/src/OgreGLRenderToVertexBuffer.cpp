@@ -32,7 +32,7 @@ THE SOFTWARE.
 #include "OgreRenderable.h"
 #include "OgreSceneManager.h"
 #include "OgreRoot.h"
-#include "OgreRenderSystem.h"
+#include "OgreGLRenderSystem.h"
 #include "OgreGLSLLinkProgramManager.h"
 #include "OgreStringConverter.h"
 #include "OgreLogManager.h"
@@ -121,7 +121,7 @@ namespace Ogre {
     {
         op.operationType = mOperationType;
         op.useIndexes = false;
-        op.vertexData = mVertexData;
+        op.vertexData = mVertexData.get();
     }
 //-----------------------------------------------------------------------------
 //-----------------------------------------------------------------------------
@@ -178,11 +178,11 @@ namespace Ogre {
 
         glBeginQuery(GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN_NV, mPrimitivesDrawnQuery);
 
-        RenderSystem* targetRenderSystem = Root::getSingleton().getRenderSystem();
+        GLRenderSystem* targetRenderSystem = static_cast<GLRenderSystem*>(Root::getSingleton().getRenderSystem());
         //Draw the object
-        targetRenderSystem->_setWorldMatrix(Matrix4::IDENTITY);
-        targetRenderSystem->_setViewMatrix(Matrix4::IDENTITY);
-        targetRenderSystem->_setProjectionMatrix(Matrix4::IDENTITY);
+        targetRenderSystem->setWorldMatrix(Matrix4::IDENTITY);
+        targetRenderSystem->setViewMatrix(Matrix4::IDENTITY);
+        targetRenderSystem->setProjectionMatrix(Matrix4::IDENTITY);
         if (r2vbPass->hasVertexProgram())
         {
             targetRenderSystem->bindGpuProgramParameters(GPT_VERTEX_PROGRAM, 
@@ -308,7 +308,7 @@ namespace Ogre {
             GLSL::GLSLLinkProgram* linkProgram = GLSL::GLSLLinkProgramManager::getSingleton().getActiveLinkProgram();
             GLhandleARB linkProgramId = linkProgram->getGLHandle();
             
-            vector<GLint>::type locations;
+            std::vector<GLint> locations;
             for (unsigned short e=0; e < declaration->getElementCount(); e++)
             {
                 const VertexElement* element =declaration->getElement(e);
@@ -330,7 +330,7 @@ namespace Ogre {
         else
         {
             //Either fixed function or assembly (CG = assembly) shaders
-            vector<GLint>::type attribs;
+            std::vector<GLint> attribs;
             for (unsigned short e=0; e < declaration->getElementCount(); e++)
             {
                 const VertexElement* element = declaration->getElement(e);

@@ -50,13 +50,18 @@ namespace Ogre {
             createSphere(mesh);
             return true;
         }
-    
+        else if(resourceName == "Prefab_Axes" || resourceName == "Ogre/Debug/AxesMesh")
+        {
+            createAxes(mesh);
+            return true;
+        }
+
         return false;
     }
     //---------------------------------------------------------------------
     void PrefabFactory::createPlane(Mesh* mesh)
     {
-        SubMesh* sub = mesh->createSubMesh();
+        //! [manual_plane_geometry]
         float vertices[32] = {
             -100, -100, 0,  // pos
             0,0,1,          // normal
@@ -71,42 +76,46 @@ namespace Ogre {
             0,0,1,
             0,0 
         };
-        mesh->sharedVertexData = OGRE_NEW VertexData();
+
+        uint16 faces[6] = {0,1,2,
+                           0,2,3 };
+        //! [manual_plane_geometry]
+
+        //! [vertex_data]
+        mesh->sharedVertexData = new VertexData();
         mesh->sharedVertexData->vertexCount = 4;
         VertexDeclaration* decl = mesh->sharedVertexData->vertexDeclaration;
         VertexBufferBinding* bind = mesh->sharedVertexData->vertexBufferBinding;
+        //! [vertex_data]
 
+        //! [vertex_decl]
         size_t offset = 0;
-        decl->addElement(0, offset, VET_FLOAT3, VES_POSITION);
-        offset += VertexElement::getTypeSize(VET_FLOAT3);
-        decl->addElement(0, offset, VET_FLOAT3, VES_NORMAL);
-        offset += VertexElement::getTypeSize(VET_FLOAT3);
-        decl->addElement(0, offset, VET_FLOAT2, VES_TEXTURE_COORDINATES, 0);
-        offset += VertexElement::getTypeSize(VET_FLOAT2);
+        offset += decl->addElement(0, offset, VET_FLOAT3, VES_POSITION).getSize();
+        offset += decl->addElement(0, offset, VET_FLOAT3, VES_NORMAL).getSize();
+        offset += decl->addElement(0, offset, VET_FLOAT2, VES_TEXTURE_COORDINATES, 0).getSize();
+        //! [vertex_decl]
 
-        HardwareVertexBufferSharedPtr vbuf = 
+        //! [vertex_buffer]
+        HardwareVertexBufferSharedPtr vbuf =
             HardwareBufferManager::getSingleton().createVertexBuffer(
-            offset, 4, HardwareBuffer::HBU_STATIC_WRITE_ONLY);
+                offset, 4, HardwareBuffer::HBU_STATIC_WRITE_ONLY);
+        vbuf->writeData(0, vbuf->getSizeInBytes(), vertices, true);
         bind->setBinding(0, vbuf);
 
-        vbuf->writeData(0, vbuf->getSizeInBytes(), vertices, true);
+        HardwareIndexBufferSharedPtr ibuf = HardwareBufferManager::getSingleton().createIndexBuffer(
+            HardwareIndexBuffer::IT_16BIT, 6, HardwareBuffer::HBU_STATIC_WRITE_ONLY);
+        ibuf->writeData(0, ibuf->getSizeInBytes(), faces, true);
+        //! [vertex_buffer]
 
+        //! [sub_mesh]
+        SubMesh* sub = mesh->createSubMesh();
         sub->useSharedVertices = true;
-        HardwareIndexBufferSharedPtr ibuf = HardwareBufferManager::getSingleton().
-            createIndexBuffer(
-            HardwareIndexBuffer::IT_16BIT, 
-            6, 
-            HardwareBuffer::HBU_STATIC_WRITE_ONLY);
-
-        unsigned short faces[6] = {0,1,2,
-            0,2,3 };
         sub->indexData->indexBuffer = ibuf;
         sub->indexData->indexCount = 6;
-        sub->indexData->indexStart =0;
-        ibuf->writeData(0, ibuf->getSizeInBytes(), faces, true);
+        sub->indexData->indexStart = 0;
+        //! [sub_mesh]
 
         mesh->_setBounds(AxisAlignedBox(-100,-100,0,100,100,0), true);
-        mesh->_setBoundingSphereRadius(Math::Sqrt(100*100+100*100));
     }
     //---------------------------------------------------------------------
     void PrefabFactory::createCube(Mesh* mesh)
@@ -216,12 +225,9 @@ namespace Ogre {
         VertexBufferBinding* bind = mesh->sharedVertexData->vertexBufferBinding;
 
         size_t offset = 0;
-        decl->addElement(0, offset, VET_FLOAT3, VES_POSITION);
-        offset += VertexElement::getTypeSize(VET_FLOAT3);
-        decl->addElement(0, offset, VET_FLOAT3, VES_NORMAL);
-        offset += VertexElement::getTypeSize(VET_FLOAT3);
-        decl->addElement(0, offset, VET_FLOAT2, VES_TEXTURE_COORDINATES, 0);
-        offset += VertexElement::getTypeSize(VET_FLOAT2);
+        offset += decl->addElement(0, offset, VET_FLOAT3, VES_POSITION).getSize();
+        offset += decl->addElement(0, offset, VET_FLOAT3, VES_NORMAL).getSize();
+        offset += decl->addElement(0, offset, VET_FLOAT2, VES_TEXTURE_COORDINATES, 0).getSize();
 
         HardwareVertexBufferSharedPtr vbuf = 
             HardwareBufferManager::getSingleton().createVertexBuffer(
@@ -270,8 +276,6 @@ namespace Ogre {
 
         mesh->_setBounds(AxisAlignedBox(-CUBE_HALF_SIZE, -CUBE_HALF_SIZE, -CUBE_HALF_SIZE,
             CUBE_HALF_SIZE, CUBE_HALF_SIZE, CUBE_HALF_SIZE), true);
-
-        mesh->_setBoundingSphereRadius(CUBE_HALF_SIZE);
     }
     //---------------------------------------------------------------------
     void PrefabFactory::createSphere(Mesh* mesh)
@@ -289,27 +293,24 @@ namespace Ogre {
         // define the vertex format
         VertexDeclaration* vertexDecl = vertexData->vertexDeclaration;
         size_t currOffset = 0;
-        // positions
-        vertexDecl->addElement(0, currOffset, VET_FLOAT3, VES_POSITION);
-        currOffset += VertexElement::getTypeSize(VET_FLOAT3);
-        // normals
-        vertexDecl->addElement(0, currOffset, VET_FLOAT3, VES_NORMAL);
-        currOffset += VertexElement::getTypeSize(VET_FLOAT3);
-        // two dimensional texture coordinates
-        vertexDecl->addElement(0, currOffset, VET_FLOAT2, VES_TEXTURE_COORDINATES, 0);
+        currOffset += vertexDecl->addElement(0, currOffset, VET_FLOAT3, VES_POSITION).getSize();
+        currOffset += vertexDecl->addElement(0, currOffset, VET_FLOAT3, VES_NORMAL).getSize();
+        currOffset += vertexDecl->addElement(0, currOffset, VET_FLOAT2, VES_TEXTURE_COORDINATES, 0).getSize();
 
         // allocate the vertex buffer
         vertexData->vertexCount = (NUM_RINGS + 1) * (NUM_SEGMENTS+1);
         HardwareVertexBufferSharedPtr vBuf = HardwareBufferManager::getSingleton().createVertexBuffer(vertexDecl->getVertexSize(0), vertexData->vertexCount, HardwareBuffer::HBU_STATIC_WRITE_ONLY, false);
         VertexBufferBinding* binding = vertexData->vertexBufferBinding;
         binding->setBinding(0, vBuf);
-        float* pVertex = static_cast<float*>(vBuf->lock(HardwareBuffer::HBL_DISCARD));
+        HardwareBufferLockGuard vBufLock(vBuf, HardwareBuffer::HBL_DISCARD);
+        float* pVertex = static_cast<float*>(vBufLock.pData);
 
         // allocate index buffer
         pSphereVertex->indexData->indexCount = 6 * NUM_RINGS * (NUM_SEGMENTS + 1);
         pSphereVertex->indexData->indexBuffer = HardwareBufferManager::getSingleton().createIndexBuffer(HardwareIndexBuffer::IT_16BIT, pSphereVertex->indexData->indexCount, HardwareBuffer::HBU_STATIC_WRITE_ONLY, false);
         HardwareIndexBufferSharedPtr iBuf = pSphereVertex->indexData->indexBuffer;
-        unsigned short* pIndices = static_cast<unsigned short*>(iBuf->lock(HardwareBuffer::HBL_DISCARD));
+        HardwareBufferLockGuard iBufLock(iBuf, HardwareBuffer::HBL_DISCARD);
+        unsigned short* pIndices = static_cast<unsigned short*>(iBufLock.pData);
 
         float fDeltaRingAngle = (Math::PI / NUM_RINGS);
         float fDeltaSegAngle = (2 * Math::PI / NUM_SEGMENTS);
@@ -351,9 +352,6 @@ namespace Ogre {
             }; // end for seg
         } // end for ring
 
-        // Unlock
-        vBuf->unlock();
-        iBuf->unlock();
         // Generate face list
         pSphereVertex->useSharedVertices = true;
 
@@ -364,4 +362,75 @@ namespace Ogre {
         mesh->_setBoundingSphereRadius(SPHERE_RADIUS);
     }
     //---------------------------------------------------------------------
+    void PrefabFactory::createAxes(Mesh* mesh)
+    {
+        ManualObject mo("");
+        mo.begin("BaseWhite");
+        /* 3 axes, each made up of 2 of these (base plane = XY)
+         *   .------------|\
+         *   '------------|/
+         */
+        mo.estimateVertexCount(7 * 2 * 3);
+        mo.estimateIndexCount(3 * 2 * 3);
+        Quaternion quat[6];
+        ColourValue col[3];
+
+        // x-axis
+        quat[0] = Quaternion::IDENTITY;
+        quat[1].FromAxes(Vector3::UNIT_X, Vector3::NEGATIVE_UNIT_Z, Vector3::UNIT_Y);
+        col[0] = ColourValue::Red;
+        col[0].a = 0.8;
+        // y-axis
+        quat[2].FromAxes(Vector3::UNIT_Y, Vector3::NEGATIVE_UNIT_X, Vector3::UNIT_Z);
+        quat[3].FromAxes(Vector3::UNIT_Y, Vector3::UNIT_Z, Vector3::UNIT_X);
+        col[1] = ColourValue::Green;
+        col[1].a = 0.8;
+        // z-axis
+        quat[4].FromAxes(Vector3::UNIT_Z, Vector3::UNIT_Y, Vector3::NEGATIVE_UNIT_X);
+        quat[5].FromAxes(Vector3::UNIT_Z, Vector3::UNIT_X, Vector3::UNIT_Y);
+        col[2] = ColourValue::Blue;
+        col[2].a = 0.8;
+
+        Vector3 basepos[7] =
+        {
+            // stalk
+            Vector3(0, 0.05, 0),
+            Vector3(0, -0.05, 0),
+            Vector3(0.7, -0.05, 0),
+            Vector3(0.7, 0.05, 0),
+            // head
+            Vector3(0.7, -0.15, 0),
+            Vector3(1, 0, 0),
+            Vector3(0.7, 0.15, 0)
+        };
+
+
+        // vertices
+        // 6 arrows
+        for (size_t i = 0; i < 6; ++i)
+        {
+            // 7 points
+            for (size_t p = 0; p < 7; ++p)
+            {
+                Vector3 pos = quat[i] * basepos[p];
+                mo.position(pos);
+                mo.colour(col[i / 2]);
+            }
+        }
+
+        // indices
+        // 6 arrows
+        for (uint32 i = 0; i < 6; ++i)
+        {
+            uint32 base = i * 7;
+            mo.triangle(base + 0, base + 1, base + 2);
+            mo.triangle(base + 0, base + 2, base + 3);
+            mo.triangle(base + 4, base + 5, base + 6);
+        }
+
+        auto sm = mesh->createSubMesh();
+        mo.end()->convertToSubMesh(sm);
+        mesh->_setBounds(mo.getBoundingBox());
+        mesh->_setBoundingSphereRadius(mo.getBoundingRadius());
+    }
 }

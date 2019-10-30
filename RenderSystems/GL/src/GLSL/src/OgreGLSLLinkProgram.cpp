@@ -39,7 +39,7 @@ THE SOFTWARE.
 namespace Ogre {
     namespace GLSL {
 
-    static GLint getGLGeometryInputPrimitiveType(RenderOperation::OperationType operationType, bool requiresAdjacency)
+    static GLint getGLGeometryInputPrimitiveType(RenderOperation::OperationType operationType)
     {
         switch (operationType)
         {
@@ -47,13 +47,19 @@ namespace Ogre {
             return GL_POINTS;
         case RenderOperation::OT_LINE_LIST:
         case RenderOperation::OT_LINE_STRIP:
-            return requiresAdjacency ? GL_LINES_ADJACENCY_EXT : GL_LINES;
+			return GL_LINES;
+        case RenderOperation::OT_LINE_LIST_ADJ:
+        case RenderOperation::OT_LINE_STRIP_ADJ:
+			return GL_LINES_ADJACENCY_EXT;
+        case RenderOperation::OT_TRIANGLE_LIST_ADJ:
+        case RenderOperation::OT_TRIANGLE_STRIP_ADJ:
+            return GL_TRIANGLES_ADJACENCY_EXT;
         default:
         case RenderOperation::OT_TRIANGLE_LIST:
         case RenderOperation::OT_TRIANGLE_STRIP:
         case RenderOperation::OT_TRIANGLE_FAN:
-            return requiresAdjacency ? GL_TRIANGLES_ADJACENCY_EXT : GL_TRIANGLES;
-        }
+            return GL_TRIANGLES;
+		}
     }
     //-----------------------------------------------------------------------
     static GLint getGLGeometryOutputPrimitiveType(RenderOperation::OperationType operationType)
@@ -64,13 +70,9 @@ namespace Ogre {
             return GL_POINTS;
         case RenderOperation::OT_LINE_STRIP:
             return GL_LINE_STRIP;
+        default:
         case RenderOperation::OT_TRIANGLE_STRIP:
             return GL_TRIANGLE_STRIP;
-        default:
-            OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR,
-                "Geometry shader output operation type can only be point list,"
-                "line strip or triangle strip",
-                            "GLSLLinkProgram::getGLGeometryOutputPrimitiveType");
         }
     }
 
@@ -96,7 +98,7 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void GLSLLinkProgram::activate(void)
     {
-        if (!mLinked && !mTriedToLinkAndFailed)
+        if (!mLinked)
         {           
             glGetError(); //Clean up the error. Otherwise will flood log.
 
@@ -108,10 +110,19 @@ namespace Ogre {
                 reportGLSLError( glErr, "GLSLLinkProgram::activate", "Error Creating GLSL Program Object", 0 );
             }
 
-            if ( GpuProgramManager::getSingleton().canGetCompiledShaderBuffer() &&
-                 GpuProgramManager::getSingleton().isMicrocodeAvailableInCache(getCombinedName()) )
+            uint32 hash = 0;
+            GpuProgram* progs[] = {mVertexShader, mGeometryProgram, mFragmentProgram};
+            for(auto p : progs)
             {
-                getMicrocodeFromCache();
+                if(!p) continue;
+                hash = p->_getHash(hash);
+            }
+
+            if ( GpuProgramManager::getSingleton().canGetCompiledShaderBuffer() &&
+                 GpuProgramManager::getSingleton().isMicrocodeAvailableInCache(hash) &&
+                 !mGeometryProgram)
+            {
+                getMicrocodeFromCache(hash);
             }
             else
             {
@@ -141,10 +152,10 @@ namespace Ogre {
         }
     }
     //-----------------------------------------------------------------------
-    void GLSLLinkProgram::getMicrocodeFromCache(void)
+    void GLSLLinkProgram::getMicrocodeFromCache(uint32 id)
     {
         GpuProgramManager::Microcode cacheMicrocode = 
-            GpuProgramManager::getSingleton().getMicrocodeFromCache(getCombinedName());
+            GpuProgramManager::getSingleton().getMicrocodeFromCache(id);
         
         GLenum binaryFormat = *((GLenum *)(cacheMicrocode->getPtr()));
         uint8 * programBuffer = cacheMicrocode->getPtr() + sizeof(GLenum);
@@ -224,7 +235,7 @@ namespace Ogre {
         GLUniformReferenceIterator endUniform = mGLUniformReferences.end();
 
         // determine if we need to transpose matrices when binding
-        int transpose = GL_TRUE;
+        bool transpose = GL_TRUE;
         if ((fromProgType == GPT_FRAGMENT_PROGRAM && mVertexShader && (!mVertexShader->getColumnMajorMatrices())) ||
             (fromProgType == GPT_VERTEX_PROGRAM && mFragmentProgram && (!mFragmentProgram->getColumnMajorMatrices())) ||
             (fromProgType == GPT_GEOMETRY_PROGRAM && mGeometryProgram && (!mGeometryProgram->getColumnMajorMatrices())))
@@ -393,29 +404,6 @@ namespace Ogre {
         } // end for
     }
     //-----------------------------------------------------------------------
-    void GLSLLinkProgram::updatePassIterationUniforms(GpuProgramParametersSharedPtr params)
-    {
-        if (params->hasPassIterationNumber())
-        {
-            size_t index = params->getPassIterationNumberIndex();
-
-            GLUniformReferenceIterator currentUniform = mGLUniformReferences.begin();
-            GLUniformReferenceIterator endUniform = mGLUniformReferences.end();
-
-            // need to find the uniform that matches the multi pass entry
-            for (;currentUniform != endUniform; ++currentUniform)
-            {
-                // get the index in the parameter real list
-                if (index == currentUniform->mConstantDef->physicalIndex)
-                {
-                    glUniform1fvARB(currentUniform->mLocation, 1, params->getFloatPointer(index));
-                    return;
-                }
-            }
-        }
-
-    }
-    //-----------------------------------------------------------------------
     Ogre::String GLSLLinkProgram::getCombinedName()
     {
         String name;
@@ -439,14 +427,10 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void GLSLLinkProgram::compileAndLink()
     {
+        uint32 hash = 0;
         if (mVertexShader)
         {
-            // compile and attach Vertex Program
-            if (!mVertexShader->compile(true))
-            {
-                // todo error
-                return;
-            }
+            // attach Vertex Program
             mVertexShader->attachToProgramObject(mGLProgramHandle);
             setSkeletalAnimationIncluded(mVertexShader->isSkeletalAnimationIncluded());
 
@@ -461,6 +445,8 @@ namespace Ogre {
 
             size_t numAttribs = sizeof(msCustomAttributes)/sizeof(CustomAttribute);
             const String& vpSource = mVertexShader->getSource();
+            
+            hash = mVertexShader->_getHash(hash);
             for (size_t i = 0; i < numAttribs; ++i)
             {
                 const CustomAttribute& a = msCustomAttributes[i];
@@ -496,20 +482,15 @@ namespace Ogre {
 
         if (mGeometryProgram)
         {
-            // compile and attach Geometry Program
-            if (!mGeometryProgram->compile(true))
-            {
-                // todo error
-                return;
-            }
-
+            hash = mGeometryProgram->_getHash(hash);
+            // attach Geometry Program
             mGeometryProgram->attachToProgramObject(mGLProgramHandle);
 
             //Don't set adjacency flag. We handle it internally and expose "false"
 
             RenderOperation::OperationType inputOperationType = mGeometryProgram->getInputOperationType();
             glProgramParameteriEXT(mGLProgramHandle, GL_GEOMETRY_INPUT_TYPE_EXT,
-                getGLGeometryInputPrimitiveType(inputOperationType, mGeometryProgram->isAdjacencyInfoRequired()));
+                getGLGeometryInputPrimitiveType(inputOperationType));
 
             RenderOperation::OperationType outputOperationType = mGeometryProgram->getOutputOperationType();
 
@@ -522,12 +503,8 @@ namespace Ogre {
 
         if (mFragmentProgram)
         {
-            // compile and attach Fragment Program
-            if (!mFragmentProgram->compile(true))
-            {
-                // todo error
-                return;
-            }       
+            hash = mFragmentProgram->_getHash(hash);
+            // attach Fragment Program
             mFragmentProgram->attachToProgramObject(mGLProgramHandle);
         }
 
@@ -536,7 +513,6 @@ namespace Ogre {
 
         glLinkProgramARB( mGLProgramHandle );
         glGetObjectParameterivARB( mGLProgramHandle, GL_OBJECT_LINK_STATUS_ARB, &mLinked );
-        mTriedToLinkAndFailed = !mLinked;
 
         // force logging and raise exception if not linked
         GLenum glErr = glGetError();
@@ -556,8 +532,6 @@ namespace Ogre {
             if ( GpuProgramManager::getSingleton().getSaveMicrocodesToCache() )
             {
                 // add to the microcode to the cache
-                String name;
-                name = getCombinedName();
 
                 // get buffer size
                 GLint binaryLength = 0;
@@ -579,7 +553,7 @@ namespace Ogre {
                 memcpy(newMicrocode->getPtr(), &binaryFormat, sizeof(GLenum));
 
                 // add to the microcode to the cache
-                GpuProgramManager::getSingleton().addMicrocodeToCache(name, newMicrocode);
+                GpuProgramManager::getSingleton().addMicrocodeToCache(hash, newMicrocode);
             }
         }
     }

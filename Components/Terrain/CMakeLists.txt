@@ -11,8 +11,6 @@
 # Terrain optional component
 ############################################################
 
-PROJECT(OgreTerrain)
-
 # define header and source files for the library
 file(GLOB HEADER_FILES "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h")
 file(GLOB SOURCE_FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
@@ -36,21 +34,19 @@ if (OGRE_BUILD_COMPONENT_PAGING)
 	src/OgreTerrainPaging.cpp
 	src/OgreTerrainPagedWorldSection.cpp
   )
-  include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../Paging/include)
 endif ()
-
-# include headers
-include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 
 # setup target
 add_library(OgreTerrain ${OGRE_COMP_LIB_TYPE} ${HEADER_FILES} ${SOURCE_FILES} ${PLATFORM_HEADER_FILES} ${PLATFORM_SOURCE_FILES})
 set_target_properties(OgreTerrain PROPERTIES VERSION ${OGRE_SOVERSION} SOVERSION ${OGRE_SOVERSION})
-target_link_libraries(OgreTerrain OgreMain)
+target_link_libraries(OgreTerrain PUBLIC OgreMain)
+
+target_include_directories(OgreTerrain PUBLIC 
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  $<INSTALL_INTERFACE:include/OGRE/Terrain>)
+
 if (OGRE_BUILD_COMPONENT_PAGING)
-	target_link_libraries(OgreTerrain OgrePaging)
-endif ()
-if (OGRE_CONFIG_THREADS)
-  target_link_libraries(OgreTerrain ${OGRE_THREAD_LIBRARIES})
+	target_link_libraries(OgreTerrain PUBLIC OgrePaging)
 endif ()
 
 
@@ -61,4 +57,6 @@ ogre_config_component(OgreTerrain)
 install(FILES ${HEADER_FILES}
   DESTINATION include/OGRE/Terrain
 )
-
+install(DIRECTORY "${PROJECT_SOURCE_DIR}/Media/Terrain"
+  DESTINATION "${OGRE_MEDIA_PATH}/"
+)

@@ -446,8 +446,8 @@ Ogre::MeshPtr LodOutsideMarker::createConvexHullMesh(const String& meshName, con
     MeshPtr mesh = MeshManager::getSingleton().createManual(meshName, resourceGroupName, NULL);
     SubMesh* subMesh = mesh->createSubMesh();
 
-    vector<Real>::type vertexBuffer;
-    vector<unsigned short>::type indexBuffer;
+    std::vector<Real> vertexBuffer;
+    std::vector<unsigned short> indexBuffer;
     // 3 position/triangle * 3 Real/position
     vertexBuffer.reserve(mHull.size() * 9);
     // 3 index / triangle
@@ -481,8 +481,7 @@ Ogre::MeshPtr LodOutsideMarker::createConvexHullMesh(const String& meshName, con
     VertexDeclaration* decl = mesh->sharedVertexData->vertexDeclaration;
     size_t offset = 0;
     // 1st buffer
-    decl->addElement(0, offset, VET_FLOAT3, VES_POSITION);
-    offset += VertexElement::getTypeSize(VET_FLOAT3);
+    offset += decl->addElement(0, offset, VET_FLOAT3, VES_POSITION).getSize();
 
     /// Allocate vertex buffer of the requested number of vertices (vertexCount) 
     /// and bytes per vertex (offset)
@@ -583,15 +582,6 @@ void LodOutsideMarker::markVertices()
             }
         }
     }
-}
-
-void LodOutsideMarker::CHTriangle::computeNormal()
-{
-    Vector3 e1 = vertex[1]->position - vertex[0]->position;
-    Vector3 e2 = vertex[2]->position - vertex[1]->position;
-
-    normal = e1.crossProduct(e2);
-    normal.normalise();
 }
 
 }

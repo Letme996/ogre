@@ -72,7 +72,7 @@ public:
     /** 
     @see SubRenderState::updateGpuProgramsParams.
     */
-    virtual void updateGpuProgramsParams(Renderable* rend, Pass* pass, const AutoParamDataSource* source, const LightList* pLightList);
+    virtual void updateGpuProgramsParams(Renderable* rend, const Pass* pass, const AutoParamDataSource* source, const LightList* pLightList);
 
     /** 
     @see SubRenderState::copyFrom.
@@ -84,14 +84,6 @@ public:
     */
     virtual bool preAddToRenderState(const RenderState* renderState, Pass* srcPass, Pass* dstPass);
     
-    //Direct3D HLSL specific methods
-    /// Wraps a sampler with a SamplerData[x]D struct defined in FFPLib_Texturing.hlsl
-    static void AddTextureSampleWrapperInvocation(UniformParameterPtr textureSampler,UniformParameterPtr textureSamplerState,
-        GpuConstantType samplerType, Function* function, int groupOrder);
-
-    /// Get a sampler wrapper type according to the sampler type
-	static ParameterPtr GetSamplerWrapperParam(UniformParameterPtr sampler, Function* function);
-
     static String Type;
 
 // Protected types:
@@ -120,8 +112,6 @@ protected:
         UniformParameterPtr mTextureViewProjImageMatrix;
         // Texture sampler parameter.
         UniformParameterPtr mTextureSampler;
-    // Texture sampler state parameter.
-        UniformParameterPtr mTextureSamplerState;
         // Vertex shader input texture coordinates parameter.
         ParameterPtr mVSInputTexCoord;
         // Vertex shader output texture coordinates parameter.
@@ -130,7 +120,7 @@ protected:
         ParameterPtr mPSInputTexCoord;
     };
 
-    typedef vector<TextureUnitParams>::type         TextureUnitParamsList;
+    typedef std::vector<TextureUnitParams>         TextureUnitParamsList;
     typedef TextureUnitParamsList::iterator         TextureUnitParamsIterator;
     typedef TextureUnitParamsList::const_iterator   TextureUnitParamsConstIterator;
 
@@ -197,13 +187,12 @@ protected:
     virtual void addPSSampleTexelInvocation(TextureUnitParams* textureUnitParams, Function* psMain, 
         const ParameterPtr& texel, int groupOrder);
 
-    virtual void addPSArgumentInvocations(Function* psMain, ParameterPtr arg, ParameterPtr texel,
-                int samplerIndex, LayerBlendSource blendSrc, const ColourValue& colourValue, Real alphaValue,
-                 bool isAlphaArgument, const int groupOrder);
+    ParameterPtr getPSArgument(ParameterPtr texel, LayerBlendSource blendSrc, const ColourValue& colourValue,
+                               Real alphaValue, bool isAlphaArgument) const;
 
     virtual void addPSBlendInvocations(Function* psMain, ParameterPtr arg1, ParameterPtr arg2,
                 ParameterPtr texel,int samplerIndex, const LayerBlendModeEx& blendMode,
-                const int groupOrder, int targetChannels);
+                const int groupOrder, Operand::OpMask targetChannels);
     
     /** 
     Determines the texture coordinates calculation method of the given texture unit state.

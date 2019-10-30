@@ -51,7 +51,7 @@ namespace Ogre {
     class _OgreExport Technique : public TechniqueAlloc
     {
     public:
-        typedef vector<Pass*>::type Passes;
+        typedef std::vector<Pass*> Passes;
 
     protected:
         /// Illumination pass state type
@@ -140,8 +140,8 @@ namespace Ogre {
             GPUDeviceNameRule(const String& pattern, IncludeOrExclude ie, bool caseSen)
                 : devicePattern(pattern), includeOrExclude(ie), caseSensitive(caseSen) {}
         };
-        typedef vector<GPUVendorRule>::type GPUVendorRuleList;
-        typedef vector<GPUDeviceNameRule>::type GPUDeviceNameRuleList;
+        typedef std::vector<GPUVendorRule> GPUVendorRuleList;
+        typedef std::vector<GPUDeviceNameRule> GPUDeviceNameRuleList;
     protected:
         GPUVendorRuleList mGPUVendorRules;
         GPUDeviceNameRuleList mGPUDeviceNameRules;
@@ -182,11 +182,11 @@ namespace Ogre {
         Pass* createPass(void);
         /** Retrieves the Pass with the given index.
          * @deprecated use getPasses() */
-        Pass* getPass(unsigned short index);
+        Pass* getPass(unsigned short index) const;
         /** Retrieves the Pass matching name.
             Returns 0 if name match is not found.
         */
-        Pass* getPass(const String& name);
+        Pass* getPass(const String& name) const;
         /** Retrieves the number of passes.
          * @deprecated use getPasses() */
         unsigned short getNumPasses(void) const;
@@ -311,7 +311,7 @@ namespace Ogre {
             property there.
         @see Pass::setAmbient
         */
-        void setAmbient(Real red, Real green, Real blue);
+        void setAmbient(float red, float green, float blue);
 
         /// @overload
         void setAmbient(const ColourValue& ambient);
@@ -324,7 +324,7 @@ namespace Ogre {
             property there.
         @see Pass::setDiffuse
         */
-        void setDiffuse(Real red, Real green, Real blue, Real alpha);
+        void setDiffuse(float red, float green, float blue, float alpha);
 
         /// @overload
         void setDiffuse(const ColourValue& diffuse);
@@ -337,7 +337,7 @@ namespace Ogre {
             property there.
         @see Pass::setSpecular
         */
-        void setSpecular(Real red, Real green, Real blue, Real alpha);
+        void setSpecular(float red, float green, float blue, float alpha);
 
         /// @overload
         void setSpecular(const ColourValue& specular);
@@ -360,7 +360,7 @@ namespace Ogre {
             property there.
         @see Pass::setSelfIllumination
         */
-        void setSelfIllumination(Real red, Real green, Real blue);
+        void setSelfIllumination(float red, float green, float blue);
 
         /// @overload
         void setSelfIllumination(const ColourValue& selfIllum);
@@ -404,6 +404,11 @@ namespace Ogre {
         @see Pass::setColourWriteEnabled
         */
         void setColourWriteEnabled(bool enabled);
+
+        /** Sets which colour buffer channels are enabled for writing for each Pass.
+         @see Pass::setColourWriteEnabled
+         */
+        void setColourWriteEnabled(bool red, bool green, bool blue, bool alpha);
 
         /** Sets the culling mode for each pass  based on the 'vertex winding'.
         @note
@@ -457,7 +462,7 @@ namespace Ogre {
             bool overrideScene,
             FogMode mode = FOG_NONE,
             const ColourValue& colour = ColourValue::White,
-            Real expDensity = 0.001, Real linearStart = 0.0, Real linearEnd = 1.0 );
+            Real expDensity = 0.001f, Real linearStart = 0.0f, Real linearEnd = 1.0f );
 
         /** Sets the depth bias to be used for each Pass.
         @note

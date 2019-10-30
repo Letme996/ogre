@@ -144,7 +144,7 @@ void TestContext::setup()
     // Get the path and list of test plugins from the config file.
     Ogre::ConfigFile testConfig;
     testConfig.load(mFSLayer->getConfigFilePath("tests.cfg"));
-    mPluginDirectory = testConfig.getSetting("TestFolder");
+    mPluginDirectory = Ogre::FileSystemLayer::resolveBundlePath(testConfig.getSetting("TestFolder"));
 
 #if OGRE_PLATFORM != OGRE_PLATFORM_APPLE && OGRE_PLATFORM != OGRE_PLATFORM_APPLE_IOS
     if (mPluginDirectory.empty()) mPluginDirectory = ".";   // user didn't specify plugins folder, try current one
@@ -268,11 +268,6 @@ OgreBites::Sample* TestContext::loadTests(Ogre::String set)
         OgreBites::SampleSet newSamples = sp->getSamples();
         for (OgreBites::SampleSet::iterator j = newSamples.begin(); j != newSamples.end(); j++)
         {
-            // skip it if using wrong rendersystem
-            Ogre::String rs = (*j)->getRequiredRenderSystem();
-            if(!rs.empty() && rs != mRoot->getRenderSystem()->getName())
-                continue;
-
             // capability check
             try
             {

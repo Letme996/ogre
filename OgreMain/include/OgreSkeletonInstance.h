@@ -121,7 +121,7 @@ namespace Ogre {
         /// Pointer back to master Skeleton
         SkeletonPtr mSkeleton;
 
-        typedef list<TagPoint*>::type TagPointList;
+        typedef std::list<TagPoint*> TagPointList;
 
         /** Active tag point list.
         @remarks
@@ -146,12 +146,8 @@ namespace Ogre {
         unsigned short mNextTagPointAutoHandle;
 
         void cloneBoneAndChildren(Bone* source, Bone* parent);
-        /** Overridden from Skeleton
-        */
-        void loadImpl(void);
-        /** Overridden from Skeleton
-        */
-        void unloadImpl(void);
+        void loadImpl(void) override;
+        void unloadImpl(void) override;
 
     };
     /** @} */

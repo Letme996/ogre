@@ -53,6 +53,9 @@ namespace Ogre {
         virtual bool attachDepthBuffer( DepthBuffer *depthBuffer );
         virtual void detachDepthBuffer();
         virtual void _detachDepthBuffer();
+
+        GLContext* getContext() const { return mFB.getContext(); }
+        GLFrameBufferObjectCommon* getFBO() { return &mFB; }
     protected:
         GLES2FrameBufferObject mFB;
         
@@ -77,11 +80,7 @@ namespace Ogre {
             main frame buffer.
         */
         void bind(RenderTarget *target);
-        
-        /** Unbind a certain render target. No-op for FBOs.
-        */
-        void unbind(RenderTarget *target) {};
-        
+
         /** Get best depth and stencil supported for given internalFormat
         */
         void getBestDepthStencil(PixelFormat internalFormat, uint32 *depthFormat, uint32 *stencilFormat);
@@ -90,10 +89,6 @@ namespace Ogre {
         */
         virtual GLES2FBORenderTexture *createRenderTexture(const String &name, 
             const GLSurfaceDesc &target, bool writeGamma, uint fsaa);
-
-        /** Create a multi render target 
-        */
-        virtual MultiRenderTarget* createMultiRenderTarget(const String & name);
         
         /** Request a render buffer. If format is GL_NONE, return a zero buffer.
         */
@@ -121,7 +116,7 @@ namespace Ogre {
         void detectFBOFormats();
         GLuint _tryFormat(GLenum depthFormat, GLenum stencilFormat);
         bool _tryPackedFormat(GLenum packedFormat);
-        void _createTempFramebuffer(PixelFormat pixFmt, GLuint internalFormat, GLuint fmt, GLenum dataType, GLuint &fb, GLuint &tid);
+        void _createTempFramebuffer(GLuint internalFormat, GLuint fmt, GLenum dataType, GLuint &fb, GLuint &tid);
     };
 }
 

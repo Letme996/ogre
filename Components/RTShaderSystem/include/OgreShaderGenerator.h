@@ -35,6 +35,7 @@ THE SOFTWARE.
 #include "OgreShaderRenderState.h"
 #include "OgreScriptTranslator.h"
 #include "OgreShaderScriptTranslator.h"
+#include "OgreMaterialSerializer.h"
 
 
 namespace Ogre {
@@ -48,6 +49,11 @@ namespace RTShader {
 /** \addtogroup RTShader
 *  @{
 */
+
+class SGRenderObjectListener;
+class SGSceneManagerListener;
+class SGScriptTranslatorManager;
+class SGResourceGroupListener;
 
 /** Shader generator system main interface. This singleton based class
 enables automatic generation of shader code based on existing material techniques.
@@ -119,57 +125,31 @@ public:
     /** 
     Set the target shader language.
     @param shaderLanguage The output shader language to use.
-    @param version
     @remarks The default shader language is cg.
     */
-    void setTargetLanguage(const String& shaderLanguage,const float version = 1.0);
+    void setTargetLanguage(const String& shaderLanguage);
 
-    /** 
-    Return if hlsl 4.0 shading language is currently in use.        
-    */
-    bool IsHlsl4() const { return mShaderLanguage == "hlsl" && mShaderLanguageVersion == 4.0f; }
     /** 
     Return the target shader language currently in use.     
     */
     const String& getTargetLanguage() const { return mShaderLanguage; }
 
     /** 
-    Return the target shader language version currently in use.     
+    Set the output shader target profiles.
+    @param type shader type
+    @param shaderProfiles The target profiles for the shader.
     */
-    float getTargetLanguageVersion() const { return mShaderLanguageVersion; }
+    void setShaderProfiles(GpuProgramType type, const String& shaderProfiles);
 
     /** 
-    Set the output vertex shader target profiles.
-    @param vertexShaderProfiles The target profiles for the vertex shader.  
+    Get the output shader target profiles.
     */
-    void setVertexShaderProfiles(const String& vertexShaderProfiles);
+    const String& getShaderProfiles(GpuProgramType type) const;
 
     /** 
-    Get the output vertex shader target profiles.   
+    Get the output shader target profiles as list of strings.
     */
-    const String& getVertexShaderProfiles() const { return mVertexShaderProfiles; }
-
-    /** 
-    Get the output vertex shader target profiles as list of strings.    
-    */
-    const StringVector& getVertexShaderProfilesList() const { return mVertexShaderProfilesList; }
-
-
-    /** 
-    Set the output fragment shader target profiles.
-    @param fragmentShaderProfiles The target profiles for the fragment shader.  
-    */
-    void setFragmentShaderProfiles(const String& fragmentShaderProfiles);
-
-    /** 
-    Get the output fragment shader target profiles. 
-    */
-    const String& getFragmentShaderProfiles() const { return mFragmentShaderProfiles; }
-
-    /** 
-    Get the output fragment shader target profiles as list of strings.
-    */
-    const StringVector& getFragmentShaderProfilesList() const { return mFragmentShaderProfilesList; }
+    const StringVector& getShaderProfilesList(GpuProgramType type);
 
     /** 
     Set the output shader cache path. Generated shader code will be written to this path.
@@ -225,12 +205,6 @@ public:
      */
     RenderState* getRenderState(const String& schemeName, const String& materialName, const String& groupName, unsigned short passIndex);
 
-#if !OGRE_RESOURCEMANAGER_STRICT
-    /// @overload
-    /// @deprecated use ShaderGenerator::getRenderState(const String& schemeName, const String& materialName, const String& groupName, ...)
-    OGRE_DEPRECATED RenderState* getRenderState(const String& schemeName, const String& materialName, unsigned short passIndex);
-#endif
-
     /** 
     Add sub render state factory. Plugins or 3d party applications may implement sub classes of
     SubRenderState interface. Add the matching factory will allow the application to create instances 
@@ -267,7 +241,13 @@ public:
     */
     SubRenderState* createSubRenderState(const String& type);
 
-    
+    /// @overload
+    template<typename T>
+    T* createSubRenderState()
+    {
+        return static_cast<T*>(createSubRenderState(T::Type));
+    }
+
     /** 
     Destroy an instance of sub render state. 
     @param subRenderState The instance to destroy.
@@ -305,31 +285,17 @@ public:
     */
     bool createShaderBasedTechnique(const Material& srcMat, const String& srcTechniqueSchemeName, const String& dstTechniqueSchemeName, bool overProgrammable = false);
 
-#if !OGRE_RESOURCEMANAGER_STRICT
     /// @overload
-    /// @deprecated use ShaderGenerator::createShaderBasedTechnique(srcMat, ...)
-    OGRE_DEPRECATED bool createShaderBasedTechnique(const String& materialName, const String& srcTechniqueSchemeName, const String& dstTechniqueSchemeName, bool overProgrammable = false);
-#endif
-
-    /// @overload
-    /// @deprecated use ShaderGenerator::createShaderBasedTechnique(srcMat, ...)
-    bool createShaderBasedTechnique(const String& materialName, const String& groupName, const String& srcTechniqueSchemeName, const String& dstTechniqueSchemeName, bool overProgrammable = false);
+    bool createShaderBasedTechnique(const Technique* srcTech, const String& dstTechniqueSchemeName, bool overProgrammable = false);
 
     /**
      Remove shader based technique from a given technique.
      Return true upon success. Failure may occur if the given source technique was not previously
      registered successfully using the createShaderBasedTechnique method.
-     @param materialName The source material name.
-     @param groupName The source group name.
-     @param srcTechniqueSchemeName The source technique scheme name.
+     @param srcTech The source technique.
      @param dstTechniqueSchemeName The destination shader based technique scheme name.
      */
-    bool removeShaderBasedTechnique(const String& materialName, const String& groupName, const String& srcTechniqueSchemeName, const String& dstTechniqueSchemeName);
-
-#if !OGRE_RESOURCEMANAGER_STRICT
-    /// @overload
-    OGRE_DEPRECATED bool removeShaderBasedTechnique(const String& materialName, const String& srcTechniqueSchemeName, const String& dstTechniqueSchemeName);
-#endif
+    bool removeShaderBasedTechnique(const Technique* srcTech, const String& dstTechniqueSchemeName);
 
     /** 
     Remove all shader based techniques of the given material. 
@@ -337,12 +303,7 @@ public:
     @param materialName The source material name.   
     @param groupName The source group name. 
     */
-    bool
-#if OGRE_RESOURCEMANAGER_STRICT
-    removeAllShaderBasedTechniques(const String& materialName, const String& groupName);
-#else
-    removeAllShaderBasedTechniques(const String& materialName, const String& groupName = ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME);
-#endif
+    bool removeAllShaderBasedTechniques(const String& materialName, const String& groupName OGRE_RESOURCE_GROUP_INIT);
 
     /** 
     Clone all shader based techniques from one material to another.
@@ -389,12 +350,7 @@ public:
     @param materialName The material to invalidate.
     @param groupName The source group name. 
     */
-    void
-#if OGRE_RESOURCEMANAGER_STRICT
-    invalidateMaterial(const String& schemeName, const String& materialName, const String& groupName);
-#else
-    invalidateMaterial(const String& schemeName, const String& materialName, const String& groupName = ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME);
-#endif
+    void invalidateMaterial(const String& schemeName, const String& materialName, const String& groupName OGRE_RESOURCE_GROUP_INIT);
 
     /** 
     Validate specific material scheme. This action will generate shader programs for the technique of the
@@ -403,12 +359,7 @@ public:
     @param materialName The material to validate.
     @param groupName The source group name. 
     */
-    bool
-#if OGRE_RESOURCEMANAGER_STRICT
-    validateMaterial(const String& schemeName, const String& materialName, const String& groupName);
-#else
-    validateMaterial(const String& schemeName, const String& materialName, const String& groupName = ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME);
-#endif
+    bool validateMaterial(const String& schemeName, const String& materialName, const String& groupName OGRE_RESOURCE_GROUP_INIT);
 
 	/**
 	Invalidate specific material scheme. This action will lead to shader regeneration of the technique belongs to the
@@ -417,12 +368,7 @@ public:
 	@param materialName The material to invalidate.
 	@param groupName The source group name.
 	*/
-    void
-#if OGRE_RESOURCEMANAGER_STRICT
-    invalidateMaterialIlluminationPasses(const String& schemeName, const String& materialName, const String& groupName);
-#else
-	invalidateMaterialIlluminationPasses(const String& schemeName, const String& materialName, const String& groupName = ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME);
-#endif
+    void invalidateMaterialIlluminationPasses(const String& schemeName, const String& materialName, const String& groupName OGRE_RESOURCE_GROUP_INIT);
 
 	/**
 	Validate specific material scheme. This action will generate shader programs illumination passes of the technique of the
@@ -431,12 +377,7 @@ public:
 	@param materialName The material to validate.
 	@param groupName The source group name.
 	*/
-	bool
-#if OGRE_RESOURCEMANAGER_STRICT
-    validateMaterialIlluminationPasses(const String& schemeName, const String& materialName, const String& groupName);
-#else
-	validateMaterialIlluminationPasses(const String& schemeName, const String& materialName, const String& groupName = ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME);
-#endif
+	bool validateMaterialIlluminationPasses(const String& schemeName, const String& materialName, const String& groupName OGRE_RESOURCE_GROUP_INIT);
 
     /** 
     Return custom material Serializer of the shader generator.
@@ -449,17 +390,10 @@ public:
     3. Add the return instance of serializer listener to the MaterialSerializer.
     4. Call one of the export methods of MaterialSerializer.
     */
-    SGMaterialSerializerListener* getMaterialSerializerListener();
+    MaterialSerializer::Listener* getMaterialSerializerListener();
 
-
-    /** Return the current number of generated vertex shaders. */
-    size_t getVertexShaderCount() const;
-
-
-    /** Return the current number of generated fragment shaders. */
-    size_t getFragmentShaderCount() const;
-
-
+    /** Return the current number of generated shaders. */
+    size_t getShaderCount(GpuProgramType type) const;
 
     /** Set the vertex shader outputs compaction policy. 
     @see VSOutputCompactPolicy.
@@ -515,26 +449,26 @@ protected:
         }
     };
 
-    typedef vector<SGPass*>::type                   SGPassList;
+    typedef std::vector<SGPass*>                   SGPassList;
     typedef SGPassList::iterator                        SGPassIterator;
     typedef SGPassList::const_iterator              SGPassConstIterator;
 
-    typedef vector<SGTechnique*>::type              SGTechniqueList;
+    typedef std::vector<SGTechnique*>              SGTechniqueList;
     typedef SGTechniqueList::iterator               SGTechniqueIterator;
     typedef SGTechniqueList::const_iterator         SGTechniqueConstIterator;
 
-    typedef map<SGTechnique*, SGTechnique*>::type   SGTechniqueMap;
+    typedef std::map<SGTechnique*, SGTechnique*>   SGTechniqueMap;
     typedef SGTechniqueMap::iterator                    SGTechniqueMapIterator;
     
-    typedef map<MatGroupPair, SGMaterial*, MatGroupPair_less>::type SGMaterialMap;
+    typedef std::map<MatGroupPair, SGMaterial*, MatGroupPair_less> SGMaterialMap;
     typedef SGMaterialMap::iterator                 SGMaterialIterator;
     typedef SGMaterialMap::const_iterator           SGMaterialConstIterator;
 
-    typedef map<String, SGScheme*>::type                SGSchemeMap;
+    typedef std::map<String, SGScheme*>                SGSchemeMap;
     typedef SGSchemeMap::iterator                   SGSchemeIterator;
     typedef SGSchemeMap::const_iterator             SGSchemeConstIterator;
 
-    typedef map<String, ScriptTranslator*>::type        SGScriptTranslatorMap;
+    typedef std::map<uint32, ScriptTranslator*>        SGScriptTranslatorMap;
     typedef SGScriptTranslatorMap::iterator         SGScriptTranslatorIterator;
     typedef SGScriptTranslatorMap::const_iterator   SGScriptTranslatorConstIterator;
 
@@ -556,10 +490,6 @@ protected:
         /** Release the CPU/GPU programs of this pass. */
         void releasePrograms();
 
-
-        /** Called when a single object is about to be rendered. */
-        void notifyRenderSingleObject(Renderable* rend, const AutoParamDataSource* source, const LightList* pLightList, bool suppressRenderStateChanges);
-
         /** Get source pass. */
         Pass* getSrcPass() { return mSrcPass; }
 
@@ -572,21 +502,13 @@ protected:
 		/** Get illumination state. */
 		bool isIlluminationPass() { return mStage != IS_UNKNOWN; }
 
-        /** Get custom FPP sub state of this pass. */
-        SubRenderState* getCustomFFPSubState(int subStateOrder);
-
         /** Get custom render state of this pass. */
         RenderState* getCustomRenderState() { return mCustomRenderState; }
 
         /** Set the custom render state of this pass. */
         void setCustomRenderState(RenderState* customRenderState) { mCustomRenderState = customRenderState; }
 
-        /// Key name for associating with a Pass instance.
-        static String UserKey;
-    
-    protected:
-        SubRenderState* getCustomFFPSubState(int subStateOrder, const RenderState* renderState);
-
+        const SGTechnique* getParent() const { return mParent; }
     protected:
         // Parent technique.
         SGTechnique* mParent;
@@ -599,7 +521,7 @@ protected:
         // Custom render state.
         RenderState* mCustomRenderState;
         // The compiled render state.
-        TargetRenderState* mTargetRenderState;
+        std::unique_ptr<TargetRenderState> mTargetRenderState;
     };
 
     
@@ -607,7 +529,7 @@ protected:
     class _OgreRTSSExport SGTechnique : public RTShaderSystemAlloc
     {
     public:
-        SGTechnique(SGMaterial* parent, Technique* srcTechnique,
+        SGTechnique(SGMaterial* parent, const Technique* srcTechnique,
                     const String& dstTechniqueSchemeName, bool overProgrammable);
         ~SGTechnique();
         
@@ -615,7 +537,7 @@ protected:
         const SGMaterial* getParent() const { return mParent; }
         
         /** Get the source technique. */
-        Technique* getSourceTechnique() { return mSrcTechnique; }
+        const Technique* getSourceTechnique() { return mSrcTechnique; }
 
         /** Get the destination technique. */
         Technique* getDestinationTechnique() { return mDstTechnique; }
@@ -657,6 +579,8 @@ protected:
         /// whether shaders are created for passes with shaders
         bool overProgrammablePass() { return mOverProgrammable; }
 
+        const SGPassList& getPassList() const  { return mPassEntries; }
+
         // Key name for associating with a Technique instance.
         static String UserKey;
 
@@ -677,12 +601,13 @@ protected:
         // Parent material.     
         SGMaterial* mParent;
         // Source technique.
-        Technique* mSrcTechnique;
+        const Technique* mSrcTechnique;
         // Destination technique.
         Technique* mDstTechnique;
 		// All passes entries, both normal and illumination.
         SGPassList mPassEntries;
         // The custom render states of all passes.
+        typedef std::vector<RenderState*> RenderStateList;
         RenderStateList mCustomRenderStates;
         // Flag that tells if destination technique should be build.        
         bool mBuildDstTechnique;
@@ -798,7 +723,7 @@ protected:
         // Tells if this scheme is out of date.
         bool mOutOfDate;
         // The global render state of this scheme.
-        RenderState* mRenderState;
+        std::unique_ptr<RenderState> mRenderState;
         // Current fog mode.
         FogMode mFogMode;
     };
@@ -806,133 +731,18 @@ protected:
 
 // Protected types.
 protected:
-    
-    /** Shader generator RenderObjectListener sub class. */
-    class _OgreRTSSExport SGRenderObjectListener : public RenderObjectListener, public RTShaderSystemAlloc
-    {
-    public:
-        SGRenderObjectListener(ShaderGenerator* owner)
-        {
-            mOwner = owner;
-        }
-
-        /** 
-        Listener overridden function notify the shader generator when rendering single object.
-        */
-        virtual void notifyRenderSingleObject(Renderable* rend, const Pass* pass,  
-            const AutoParamDataSource* source, 
-            const LightList* pLightList, bool suppressRenderStateChanges)
-        {
-            mOwner->notifyRenderSingleObject(rend, pass, source, pLightList, suppressRenderStateChanges);
-        }
-
-    protected:
-        ShaderGenerator* mOwner;
-    };
-
-    /** Shader generator scene manager sub class. */
-    class _OgreRTSSExport SGSceneManagerListener : public SceneManager::Listener, public RTShaderSystemAlloc
-    {
-    public:
-        SGSceneManagerListener(ShaderGenerator* owner)
-        {
-            mOwner = owner;
-        }
-
-        /** 
-        Listener overridden function notify the shader generator when finding visible objects process started.
-        */
-        virtual void preFindVisibleObjects(SceneManager* source, 
-            SceneManager::IlluminationRenderStage irs, Viewport* v)
-        {
-            mOwner->preFindVisibleObjects(source, irs, v);
-        }
-
-        virtual void postFindVisibleObjects(SceneManager* source, 
-            SceneManager::IlluminationRenderStage irs, Viewport* v)
-        {
-
-        }
-
-        virtual void shadowTexturesUpdated(size_t numberOfShadowTextures) 
-        {
-
-        }
-
-        virtual void shadowTextureCasterPreViewProj(Light* light, 
-            Camera* camera, size_t iteration) 
-        {
-
-        }
-
-        virtual void shadowTextureReceiverPreViewProj(Light* light, 
-            Frustum* frustum)
-        {
-
-        }
-
-    protected:
-        // The shader generator instance.
-        ShaderGenerator* mOwner;
-    };
-
-    /** Shader generator ScriptTranslatorManager sub class. */
-    class _OgreRTSSExport SGScriptTranslatorManager : public ScriptTranslatorManager
-    {
-    public:
-        SGScriptTranslatorManager(ShaderGenerator* owner)
-        {
-            mOwner = owner;
-        }
-
-        /// Returns the number of translators being managed
-        virtual size_t getNumTranslators() const
-        {
-            return mOwner->getNumTranslators();
-        }
-        
-        /// Returns a manager for the given object abstract node, or null if it is not supported
-        virtual ScriptTranslator *getTranslator(const AbstractNodePtr& node)
-        {
-            return mOwner->getTranslator(node);
-        }
-
-    protected:
-        // The shader generator instance.
-        ShaderGenerator* mOwner;
-    };
-
-    class _OgreRTSSExport SGResourceGroupListener : public ResourceGroupListener
-    {
-    public:
-        SGResourceGroupListener(ShaderGenerator* owner)
-        {
-            mOwner = owner;
-        }
-
-        /// sync our internal list if material gets dropped
-        virtual void resourceRemove(const ResourcePtr& resource)
-        {
-            if(!dynamic_cast<Material*>(resource.get()))
-                return;
-            mOwner->removeAllShaderBasedTechniques(resource->getName(), resource->getGroup());
-        }
-
-    protected:
-        // The shader generator instance.
-        ShaderGenerator* mOwner;
-    };
-
     //-----------------------------------------------------------------------------
-    typedef map<String, SubRenderStateFactory*>::type       SubRenderStateFactoryMap;
+    typedef std::map<String, SubRenderStateFactory*>       SubRenderStateFactoryMap;
     typedef SubRenderStateFactoryMap::iterator              SubRenderStateFactoryIterator;
     typedef SubRenderStateFactoryMap::const_iterator        SubRenderStateFactoryConstIterator;
 
     //-----------------------------------------------------------------------------
-    typedef map<String, SceneManager*>::type                SceneManagerMap;
+    typedef std::map<String, SceneManager*>                SceneManagerMap;
     typedef SceneManagerMap::iterator                       SceneManagerIterator;
     typedef SceneManagerMap::const_iterator                 SceneManagerConstIterator;
 
+    friend class SGRenderObjectListener;
+    friend class SGSceneManagerListener;
 protected:
     /** Class default constructor */
     ShaderGenerator();
@@ -953,10 +763,10 @@ protected:
     void preFindVisibleObjects(SceneManager* source, SceneManager::IlluminationRenderStage irs, Viewport* v);
 
     /** Create sub render state core extensions factories */
-    void createSubRenderStateExFactories();
+    void createBuiltinSRSFactories();
 
     /** Destroy sub render state core extensions factories */
-    void destroySubRenderStateExFactories();
+    void destroyBuiltinSRSFactories();
 
     /** Create an instance of the SubRenderState based on script properties using the
     current sub render state factories.
@@ -977,24 +787,6 @@ protected:
     @param translator The translator for the specific SubRenderState
     */
     SubRenderState* createSubRenderState(ScriptCompiler* compiler, PropertyAbstractNode* prop, TextureUnitState* texState, SGScriptTranslator* translator);
-
-    /** 
-    Add custom script translator. 
-    Return true upon success.
-    @param key The key name of the given translator.
-    @param translator The translator to associate with the given key.
-    */
-    bool addCustomScriptTranslator(const String& key, ScriptTranslator* translator);
-
-    /** 
-    Remove custom script translator. 
-    Return true upon success.
-    @param key The key name of the translator to remove.    
-    */
-    bool removeCustomScriptTranslator(const String& key);
-
-    /** Return number of script translators. */
-    size_t getNumTranslators() const;
 
     /** Return a matching script translator. */
     ScriptTranslator* getTranslator(const AbstractNodePtr& node);
@@ -1032,6 +824,9 @@ protected:
 
     /** Used to check if finalizing */
     bool getIsFinalizing() const;
+
+    /** Internal method that creates list of SGPass instances composing the given material. */
+    SGPassList createSGPassList(Material* mat) const;
 protected:  
     // Auto mutex.
     OGRE_AUTO_MUTEX;
@@ -1040,23 +835,19 @@ protected:
     // A map of all scene managers this generator is bound to.
     SceneManagerMap mSceneManagerMap;
     // Render object listener.
-    SGRenderObjectListener* mRenderObjectListener;
+    std::unique_ptr<SGRenderObjectListener> mRenderObjectListener;
     // Scene manager listener.
-    SGSceneManagerListener* mSceneManagerListener;
+    std::unique_ptr<SGSceneManagerListener> mSceneManagerListener;
     // Script translator manager.
-    SGScriptTranslatorManager* mScriptTranslatorManager;
+    std::unique_ptr<SGScriptTranslatorManager> mScriptTranslatorManager;
     // Custom material Serializer listener - allows exporting material that contains shader generated techniques.
-    SGMaterialSerializerListener* mMaterialSerializerListener;
+    std::unique_ptr<SGMaterialSerializerListener> mMaterialSerializerListener;
     // get notified if materials get dropped
-    SGResourceGroupListener* mResourceGroupListener;
-    // A map of the registered custom script translators.
-    SGScriptTranslatorMap mScriptTranslatorsMap;
+    std::unique_ptr<SGResourceGroupListener> mResourceGroupListener;
     // The core translator of the RT Shader System.
     SGScriptTranslator mCoreScriptTranslator;
     // The target shader language (currently only cg supported).
     String mShaderLanguage;
-    // The target shader language version.
-    float  mShaderLanguageVersion;
     // The target vertex shader profile. Will be used as argument for program compilation.
     String mVertexShaderProfiles;
     // List of target vertex shader profiles.
@@ -1068,13 +859,13 @@ protected:
     // Path for caching the generated shaders.
     String mShaderCachePath;
     // Shader program manager.
-    ProgramManager* mProgramManager;
+    std::unique_ptr<ProgramManager> mProgramManager;
     // Shader program writer manager.
-    ProgramWriterManager* mProgramWriterManager;
+    std::unique_ptr<ProgramWriterManager> mProgramWriterManager;
     // File system layer manager.
     FileSystemLayer* mFSLayer;
     // Fixed Function Render state builder.
-    FFPRenderStateBuilder* mFFPRenderStateBuilder;
+    std::unique_ptr<FFPRenderStateBuilder> mFFPRenderStateBuilder;
     // Material entries map.
     SGMaterialMap mMaterialEntriesMap;
     // Scheme entries map.
@@ -1084,7 +875,7 @@ protected:
     // Sub render state registered factories.
     SubRenderStateFactoryMap mSubRenderStateFactories;
     // Sub render state core extension factories.
-    SubRenderStateFactoryMap mSubRenderStateExFactories;
+    std::vector<SubRenderStateFactory*> mBuiltinSRSFactories;
     // True if active view port use a valid SGScheme.
     bool mActiveViewportValid;
     // Light count per light type.
@@ -1095,6 +886,8 @@ protected:
     bool mCreateShaderOverProgrammablePass;
     // A flag to indicate finalizing
     bool mIsFinalizing;
+
+    uint32 ID_RT_SHADER_SYSTEM;
 private:
     friend class SGPass;
     friend class FFPRenderStateBuilder;

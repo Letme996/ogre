@@ -76,7 +76,7 @@ public:
     /** 
     @see SubRenderState::updateGpuProgramsParams.
     */
-    virtual void            updateGpuProgramsParams (Renderable* rend, Pass* pass,  const AutoParamDataSource* source,  const LightList* pLightList);
+    virtual void            updateGpuProgramsParams (Renderable* rend, const Pass* pass,  const AutoParamDataSource* source,  const LightList* pLightList);
 
     /** Sets the reflection map type. */
     void                    setReflectionMapType    (TextureType type);
@@ -136,13 +136,13 @@ protected:
     /** 
     Internal method that adds related vertex shader functions invocations.
     */
-    bool            addVSInvocations                (Function* vsMain, const int groupOrder);
+    bool            addVSInvocations                (const FunctionStageRef& stage);
 
 
     /** 
     Internal method that adds related pixel shader functions invocations.
     */
-    bool            addPSInvocations                (Function* psMain, const int groupOrder);
+    bool            addPSInvocations                (const FunctionStageRef& stage);
 
 
 // Attributes.

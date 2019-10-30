@@ -34,7 +34,7 @@ THE SOFTWARE.
 #include "OgreResourceManager.h"
 #include "OgreTexture.h"
 #include "OgreSingleton.h"
-
+#include "OgreTextureUnitState.h"
 
 namespace Ogre {
 
@@ -64,24 +64,42 @@ namespace Ogre {
         TextureManager(void);
         virtual ~TextureManager();
 
+        /// create a new sampler
+        SamplerPtr createSampler(const String& name = BLANKSTRING)
+        {
+            SamplerPtr ret = _createSamplerImpl();
+            if(!name.empty())
+            {
+                OgreAssert(mNamedSamplers.find(name) == mNamedSamplers.end(),
+                           ("Sampler '" + name + "' already exists").c_str());
+                mNamedSamplers[name] = ret;
+            }
+            return ret;
+        }
+
+        /// retrieve an named sampler
+        const SamplerPtr& getSampler(const String& name) const
+        {
+            static SamplerPtr nullPtr;
+            auto it = mNamedSamplers.find(name);
+            if(it == mNamedSamplers.end())
+                return nullPtr;
+            return it->second;
+        }
 
         /// Create a new texture
-        /// @see ResourceManager::createResource
+        /// @copydetails ResourceManager::createResource
         TexturePtr create (const String& name, const String& group,
                             bool isManual = false, ManualResourceLoader* loader = 0,
                             const NameValuePairList* createParams = 0);
-        /// Get a resource by name
-        /// @see ResourceManager::getResourceByName
-        TexturePtr
-#if OGRE_RESOURCEMANAGER_STRICT
-        getByName(const String& name, const String& groupName);
-#else
-        getByName(const String& name, const String& groupName = ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME);
-#endif
+        /// @copydoc ResourceManager::getResourceByName
+        TexturePtr getByName(const String& name, const String& groupName OGRE_RESOURCE_GROUP_INIT);
 
         using ResourceManager::createOrRetrieve;
 
         /** @overload createOrRetrieve
+            
+            @copydetails ResourceManager::createResource
 
             @param
                 texType The type of texture to load/create, defaults to normal 2D textures
@@ -108,7 +126,7 @@ namespace Ogre {
         ResourceCreateOrRetrieveResult createOrRetrieve(
             const String &name, const String& group, bool isManual,
             ManualResourceLoader* loader, const NameValuePairList* createParams,
-            TextureType texType = TEX_TYPE_2D, int numMipmaps = MIP_DEFAULT, 
+            TextureType texType, int numMipmaps = MIP_DEFAULT,
             Real gamma = 1.0f, bool isAlpha = false,
             PixelFormat desiredFormat = PF_UNKNOWN, bool hwGammaCorrection = false);
 
@@ -132,8 +150,10 @@ namespace Ogre {
                 single channel colour texture - useful for fixed-function systems.
             @param 
                 desiredFormat The format you would like to have used instead of
-                the format being based on the contents of the texture
-            @param hwGammaCorrection Pass 'true' to enable hardware gamma correction
+                the format being based on the contents of the texture; the manager reserves
+                the right to create a different format for the texture if the 
+                original format is not available in this context.
+            @param hwGammaCorrection pass 'true' to enable hardware gamma correction
                 (sRGB) on this texture. The hardware will convert from gamma space
                 to linear space when reading from this texture. Only applicable for 
                 8-bits per channel textures, will be ignored for other types. Has the advantage
@@ -146,33 +166,7 @@ namespace Ogre {
             PixelFormat desiredFormat = PF_UNKNOWN, bool hwGammaCorrection = false);
 
         /** Loads a texture from a file.
-            @param
-                name The file to load, or a String identifier in some cases
-            @param
-                group The name of the resource group to assign the texture to
-            @param
-                texType The type of texture to load/create, defaults to normal 2D textures
-            @param
-                numMipmaps The number of pre-filtered mipmaps to generate. If left to MIP_DEFAULT then
-                the TextureManager's default number of mipmaps will be used (see setDefaultNumMipmaps())
-                If set to MIP_UNLIMITED mipmaps will be generated until the lowest possible
-                level, 1x1x1.
-            @param
-                gamma The gamma adjustment factor to apply to this texture (brightening/darkening)
-                    during loading
-            @param 
-                isAlpha Only applicable to greyscale images. If true, specifies that
-                the image should be loaded into an alpha texture rather than a
-                single channel colour texture - useful for fixed-function systems.
-            @param 
-                desiredFormat The format you would like to have used instead of
-                the format being based on the contents of the texture. Pass PF_UNKNOWN
-                to default.
-            @param hwGammaCorrection Pass 'true' to enable hardware gamma correction
-                (sRGB) on this texture. The hardware will convert from gamma space
-                to linear space when reading from this texture. Only applicable for 
-                8-bits per channel textures, will be ignored for other types. Has the advantage
-                over pre-applied gamma that the texture precision is maintained.
+            @copydetails TextureManager::prepare
         */
         TexturePtr load(
             const String& name, const String& group, 
@@ -184,33 +178,9 @@ namespace Ogre {
         /** Loads a texture from an Image object.
             @note
                 The texture will create as manual texture without loader.
-            @param
-                name The name to give the resulting texture
-            @param
-                group The name of the resource group to assign the texture to
+            @copydetails TextureManager::prepare
             @param
                 img The Image object which contains the data to load
-            @param
-                texType The type of texture to load/create, defaults to normal 2D textures
-            @param
-                numMipmaps The number of pre-filtered mipmaps to generate. If left to MIP_DEFAULT then
-                the TextureManager's default number of mipmaps will be used (see setDefaultNumMipmaps())
-                If set to MIP_UNLIMITED mipmaps will be generated until the lowest possible
-                level, 1x1x1.
-            @param
-                gamma The gamma adjustment factor to apply to this texture (brightening/darkening)
-            @param 
-                isAlpha Only applicable to greyscale images. If true, specifies that
-                the image should be loaded into an alpha texture rather than a
-                single channel colour texture - useful for fixed-function systems.
-            @param 
-                desiredFormat The format you would like to have used instead of
-                the format being based on the contents of the texture
-            @param hwGammaCorrection Pass 'true' to enable hardware gamma correction
-                (sRGB) on this texture. The hardware will convert from gamma space
-                to linear space when reading from this texture. Only applicable for 
-                8-bits per channel textures, will be ignored for other types. Has the advantage
-                over pre-applied gamma that the texture precision is maintained.
         */
         virtual TexturePtr loadImage( 
             const String &name, const String& group, const Image &img, 
@@ -301,6 +271,7 @@ namespace Ogre {
             @param fsaa The level of multisampling to use if this is a render target. Ignored
                 if usage does not include TU_RENDERTARGET or if the device does
                 not support it.
+            @param fsaaHint specify "Quality" to enable CSAA on D3D
         */
         virtual TexturePtr createManual(const String & name, const String& group,
             TextureType texType, uint width, uint height, uint depth, 
@@ -425,7 +396,7 @@ namespace Ogre {
         @return true if the texture filtering is supported.
         */
         virtual bool isHardwareFilteringSupported(TextureType ttype, PixelFormat format, int usage,
-            bool preciseFormatOnly = false) = 0;
+            bool preciseFormatOnly = false);
 
         /** Sets the default number of mipmaps to be used for loaded textures, for when textures are
             loaded automatically (e.g. by Material class) or when 'load' is called with the default
@@ -447,6 +418,9 @@ namespace Ogre {
         /// Internal method to create a warning texture (bound when a texture unit is blank)
         const TexturePtr& _getWarningTexture();
 
+        /// get the default sampler
+        const SamplerPtr& getDefaultSampler();
+
         /// @copydoc Singleton::getSingleton()
         static TextureManager& getSingleton(void);
         /// @copydoc Singleton::getSingleton()
@@ -454,10 +428,48 @@ namespace Ogre {
 
     protected:
 
+        virtual SamplerPtr _createSamplerImpl() { return std::make_shared<Sampler>(); }
+
         ushort mPreferredIntegerBitDepth;
         ushort mPreferredFloatBitDepth;
         uint32 mDefaultNumMipmaps;
         TexturePtr mWarningTexture;
+        SamplerPtr mDefaultSampler;
+        std::map<String, SamplerPtr> mNamedSamplers;
+    };
+
+    /// Specialisation of TextureManager for offline processing. Cannot be used with an active RenderSystem.
+    class _OgreExport DefaultTextureManager : public TextureManager
+    {
+        /// noop implementation
+        class NullTexture : public Texture
+        {
+        public:
+            NullTexture(ResourceManager* creator, const String& name, ResourceHandle handle,
+                        const String& group)
+                : Texture(creator, name, handle, group)
+            {
+            }
+            const HardwarePixelBufferSharedPtr& getBuffer(size_t, size_t) override
+            {
+                static HardwarePixelBufferSharedPtr nullBuffer;
+                return nullBuffer;
+            }
+
+        protected:
+            void createInternalResourcesImpl() override {}
+            void freeInternalResourcesImpl() override {}
+            void loadImpl() override {}
+        };
+    public:
+        bool isHardwareFilteringSupported(TextureType, PixelFormat, int, bool) override { return false; }
+        PixelFormat getNativeFormat(TextureType, PixelFormat, int) override { return PF_UNKNOWN; }
+
+        Resource* createImpl(const String& name, ResourceHandle handle, const String& group, bool,
+                             ManualResourceLoader*, const NameValuePairList*) override
+        {
+            return new NullTexture(this, name, handle, group);
+        }
     };
     /** @} */
     /** @} */

@@ -61,7 +61,7 @@ namespace Ogre
     /** The ConcreteNode is the struct that holds an un-conditioned sub-tree of parsed input */
     struct ConcreteNode;
     typedef SharedPtr<ConcreteNode> ConcreteNodePtr;
-    typedef list<ConcreteNodePtr>::type ConcreteNodeList;
+    typedef std::list<ConcreteNodePtr> ConcreteNodeList;
     typedef SharedPtr<ConcreteNodeList> ConcreteNodeListPtr;
     struct ConcreteNode : public ScriptCompilerAlloc
     {
@@ -85,7 +85,7 @@ namespace Ogre
     };
     class AbstractNode;
     typedef SharedPtr<AbstractNode> AbstractNodePtr;
-    typedef list<AbstractNodePtr>::type AbstractNodeList;
+    typedef std::list<AbstractNodePtr> AbstractNodeList;
     typedef SharedPtr<AbstractNodeList> AbstractNodeListPtr;
 
     class _OgreExport AbstractNode : public AbstractNodeAlloc
@@ -102,7 +102,7 @@ namespace Ogre
         /// Returns a new AbstractNode which is a replica of this one.
         virtual AbstractNode *clone() const = 0;
         /// Returns a string value depending on the type of the AbstractNode.
-        virtual String getValue() const = 0;
+        virtual const String& getValue() const = 0;
     };
 
     /** This is an abstract node which cannot be broken down further */
@@ -114,19 +114,17 @@ namespace Ogre
     public:
         AtomAbstractNode(AbstractNode *ptr);
         AbstractNode *clone() const;
-        String getValue() const;
-    private:
-        void parseNumber() const;
+        const String& getValue() const { return value; }
     };
 
     /** This specific abstract node represents a script object */
     class _OgreExport ObjectAbstractNode : public AbstractNode
     {
     private:
-        map<String,String>::type mEnv;
+        std::map<String,String> mEnv;
     public:
         String name, cls;
-        vector<String>::type bases;
+        std::vector<String> bases;
         uint32 id;
         bool abstract;
         AbstractNodeList children;
@@ -135,12 +133,12 @@ namespace Ogre
     public:
         ObjectAbstractNode(AbstractNode *ptr);
         AbstractNode *clone() const;
-        String getValue() const;
+        const String& getValue() const { return cls; }
 
         void addVariable(const String &name);
         void setVariable(const String &name, const String &value);
         std::pair<bool,String> getVariable(const String &name) const;
-        const map<String,String>::type &getVariables() const;
+        const std::map<String,String> &getVariables() const;
     };
 
     /** This abstract node represents a script property */
@@ -153,7 +151,7 @@ namespace Ogre
     public:
         PropertyAbstractNode(AbstractNode *ptr);
         AbstractNode *clone() const;
-        String getValue() const;
+        const String& getValue() const { return name; }
     };
 
     /** This abstract node represents an import statement */
@@ -164,7 +162,7 @@ namespace Ogre
     public:
         ImportAbstractNode();
         AbstractNode *clone() const;
-        String getValue() const;
+        const String& getValue() const { return target; }
     };
 
     /** This abstract node represents a variable assignment */
@@ -175,7 +173,7 @@ namespace Ogre
     public:
         VariableAccessAbstractNode(AbstractNode *ptr);
         AbstractNode *clone() const;
-        String getValue() const;
+        const String& getValue() const { return name; }
     };
 
     class ScriptCompilerEvent;
@@ -188,18 +186,8 @@ namespace Ogre
     class _OgreExport ScriptCompiler : public ScriptCompilerAlloc
     {
     public: // Externally accessible types
-        //typedef map<String,uint32>::type IdMap;
-        typedef OGRE_HashMap<String,uint32> IdMap;
-
-        // The container for errors
-        struct Error : public ScriptCompilerAlloc
-        {
-            String file, message;
-            int line;
-            uint32 code;
-        };
-        typedef SharedPtr<Error> ErrorPtr;
-        typedef list<ErrorPtr>::type ErrorList;
+        //typedef std::map<String,uint32> IdMap;
+        typedef std::unordered_map<String,uint32> IdMap;
 
         // These are the built-in error codes
         enum{
@@ -214,8 +202,8 @@ namespace Ogre
             CE_DUPLICATEOVERRIDE,
             CE_UNEXPECTEDTOKEN,
             CE_OBJECTBASENOTFOUND,
-            CE_UNSUPPORTEDBYRENDERSYSTEM,
-            CE_REFERENCETOANONEXISTINGOBJECT
+            CE_REFERENCETOANONEXISTINGOBJECT,
+            CE_DEPRECATEDSYMBOL
         };
         static String formatErrorCode(uint32 code);
     public:
@@ -269,24 +257,25 @@ namespace Ogre
 		uint32 registerCustomWordId(const String &word);
 
     private: // Tree processing
-        AbstractNodeListPtr convertToAST(const ConcreteNodeListPtr &nodes);
+        AbstractNodeListPtr convertToAST(const ConcreteNodeList &nodes);
         /// This built-in function processes import nodes
-        void processImports(AbstractNodeListPtr &nodes);
+        void processImports(AbstractNodeList &nodes);
         /// Loads the requested script and converts it to an AST
         AbstractNodeListPtr loadImportPath(const String &name);
         /// Returns the abstract nodes from the given tree which represent the target
-        AbstractNodeListPtr locateTarget(AbstractNodeList *nodes, const String &target);
+        AbstractNodeList locateTarget(const AbstractNodeList& nodes, const String &target);
         /// Handles object inheritance and variable expansion
-        void processObjects(AbstractNodeList *nodes, const AbstractNodeListPtr &top);
+        void processObjects(AbstractNodeList& nodes, const AbstractNodeList &top);
         /// Handles processing the variables
-        void processVariables(AbstractNodeList *nodes);
+        void processVariables(AbstractNodeList& nodes);
         /// This function overlays the given object on the destination object following inheritance rules
-        void overlayObject(const AbstractNodePtr &source, ObjectAbstractNode *dest);
+        void overlayObject(const ObjectAbstractNode &source, ObjectAbstractNode& dest);
         /// Returns true if the given class is name excluded
-        bool isNameExcluded(const String &cls, AbstractNode *parent);
+        bool isNameExcluded(const ObjectAbstractNode& node, AbstractNode *parent);
         /// This function sets up the initial values in word id map
         void initWordMap();
     private:
+        friend String getPropertyName(const ScriptCompiler *compiler, uint32 id);
         // Resource group
         String mGroup;
         // The word -> id conversion table
@@ -296,18 +285,26 @@ namespace Ogre
 		uint32 mLargestRegisteredWordId;
 
         // This is an environment map
-        typedef map<String,String>::type Environment;
+        typedef std::map<String,String> Environment;
         Environment mEnv;
 
-        typedef map<String,AbstractNodeListPtr>::type ImportCacheMap;
+        typedef std::map<String,AbstractNodeListPtr> ImportCacheMap;
         ImportCacheMap mImports; // The set of imported scripts to avoid circular dependencies
-        typedef multimap<String,String>::type ImportRequestMap;
+        typedef std::multimap<String,String> ImportRequestMap;
         ImportRequestMap mImportRequests; // This holds the target objects for each script to be imported
 
         // This stores the imports of the scripts, so they are separated and can be treated specially
         AbstractNodeList mImportTable;
 
         // Error list
+        // The container for errors
+        struct Error
+        {
+            String file, message;
+            int line;
+            uint32 code;
+        };
+        typedef std::list<Error> ErrorList;
         ErrorList mErrors;
 
         // The listener
@@ -407,17 +404,14 @@ namespace Ogre
         // A list of patterns loaded by this compiler manager
         StringVector mScriptPatterns;
 
-        // A pointer to the listener used for compiling scripts
-        ScriptCompilerListener *mListener;
-
         // Stores a map from object types to the translators that handle them
-        vector<ScriptTranslatorManager*>::type mManagers;
+        std::vector<ScriptTranslatorManager*> mManagers;
 
         // A pointer to the built-in ScriptTranslatorManager
         ScriptTranslatorManager *mBuiltinTranslatorManager;
 
-        // A pointer to the specific compiler instance used
-        OGRE_THREAD_POINTER(ScriptCompiler, mScriptCompiler);
+        // the specific compiler instance used
+        ScriptCompiler mScriptCompiler;
     public:
         ScriptCompilerManager();
         virtual ~ScriptCompilerManager();
@@ -865,6 +859,14 @@ namespace Ogre
 
         // Support for subroutine
         ID_SUBROUTINE,
+
+        // added during 1.11. re-sort for 1.12
+        ID_LINE_WIDTH,
+        ID_SAMPLER,
+        ID_SAMPLER_REF,
+        ID_THREAD_GROUPS,
+        ID_RENDER_CUSTOM,
+        ID_AUTO,
 
         ID_END_BUILTIN_IDS
     };

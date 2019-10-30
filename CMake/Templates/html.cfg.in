@@ -45,14 +45,14 @@ PROJECT_BRIEF          = "Object-Oriented Graphics Rendering Engine"
 # exceed 55 pixels and the maximum width should not exceed 200 pixels.
 # Doxygen will copy the logo to the output directory.
 
-PROJECT_LOGO           = "${OGRE_SOURCE_DIR}/Docs/ogre-logo-wetfloor.gif"
+PROJECT_LOGO           = "${PROJECT_SOURCE_DIR}/Docs/ogre-logo.png"
 
 # The OUTPUT_DIRECTORY tag is used to specify the (relative or absolute)
 # base path where the generated documentation will be put.
 # If a relative path is entered, it will be relative to the location
 # where doxygen was started. If left blank the current directory will be used.
 
-OUTPUT_DIRECTORY       = "${OGRE_BINARY_DIR}/api/"
+OUTPUT_DIRECTORY       = "${PROJECT_BINARY_DIR}/api/"
 
 # If the CREATE_SUBDIRS tag is set to YES, then doxygen will create
 # 4096 sub-directories (in 2 levels) under the output directory of each output
@@ -205,7 +205,8 @@ TAB_SIZE               = 4
 # will result in a user-defined paragraph with heading "Side Effects:".
 # You can put \n's in the value part of an alias to insert newlines.
 
-ALIASES                =
+ALIASES                =  ffp_rtss_only="@note Only has an effect with the fixed-function pipeline or the @ref rtss"
+ALIASES               +=  shaderparam="@note When using shader programs, you have to explicitely forward this property in the @ref Program-Parameter-Specification"
 
 # This tag can be used to specify a number of word-keyword mappings (TCL only).
 # A mapping has the form "name=value". For example adding
@@ -602,7 +603,13 @@ LAYOUT_FILE            =
 # feature you need bibtex and perl available in the search path. Do not use
 # file names with spaces, bibtex cannot handle them.
 
-CITE_BIB_FILES         = "${OGRE_SOURCE_DIR}/Docs/src/bibliography.bib"
+CITE_BIB_FILES         = "${PROJECT_SOURCE_DIR}/Docs/src/bibliography.bib"
+
+# The LATEX_BIB_STYLE tag can be used to specify the style to use for the
+# bibliography, e.g. plainnat, or ieeetr. The default style is "plain". See
+# http://en.wikipedia.org/wiki/BibTeX for more info.
+
+LATEX_BIB_STYLE        = plain
 
 #---------------------------------------------------------------------------
 # configuration options related to warning and progress messages
@@ -653,7 +660,7 @@ WARN_FORMAT            = "$file:$line: $text"
 # and error messages should be written. If left blank the output is written
 # to stderr.
 
-WARN_LOGFILE           = "${OGRE_BINARY_DIR}/doxygen_warnings.log"
+WARN_LOGFILE           = "${PROJECT_BINARY_DIR}/doxygen_warnings.log"
 
 #---------------------------------------------------------------------------
 # configuration options related to the input files
@@ -730,7 +737,7 @@ EXCLUDE_SYMBOLS        =
 # directories that contain example code fragments that are included (see
 # the \include command).
 
-EXAMPLE_PATH           = "${OGRE_SOURCE_DIR}"
+EXAMPLE_PATH           = "${PROJECT_SOURCE_DIR}"
 
 # If the value of the EXAMPLE_PATH tag contains directories, you can use the
 # EXAMPLE_PATTERNS tag to specify one or more wildcard pattern (like *.cpp
@@ -750,8 +757,8 @@ EXAMPLE_RECURSIVE      = NO
 # directories that contain image that are included in the documentation (see
 # the \image command).
 
-IMAGE_PATH             = "${OGRE_SOURCE_DIR}/Docs/src/tutorials/" \
-                         "${OGRE_SOURCE_DIR}/Docs/src/images/"
+IMAGE_PATH             = "${PROJECT_SOURCE_DIR}/Docs/src/tutorials/" \
+                         "${PROJECT_SOURCE_DIR}/Docs/src/images/"
 
 # The INPUT_FILTER tag can be used to specify a program that doxygen should
 # invoke to filter for each input file. Doxygen will invoke the filter program
@@ -941,7 +948,7 @@ HTML_STYLESHEET        =
 # robust against future updates. Doxygen will copy the style sheet file to
 # the output directory.
 
-HTML_EXTRA_STYLESHEET  = "${OGRE_SOURCE_DIR}/Docs/ogre_style.css"
+HTML_EXTRA_STYLESHEET  = "${PROJECT_SOURCE_DIR}/Docs/ogre_style.css"
 
 # The HTML_EXTRA_FILES tag can be used to specify one or more extra images or
 # other source files which should be copied to the HTML output directory. Note
@@ -999,157 +1006,6 @@ HTML_DYNAMIC_SECTIONS  = YES
 # and will result in a full expanded tree by default.
 
 HTML_INDEX_NUM_ENTRIES = 100
-
-# If the GENERATE_DOCSET tag is set to YES, additional index files
-# will be generated that can be used as input for Apple's Xcode 3
-# integrated development environment, introduced with OSX 10.5 (Leopard).
-# To create a documentation set, doxygen will generate a Makefile in the
-# HTML output directory. Running make will produce the docset in that
-# directory and running "make install" will install the docset in
-# ~/Library/Developer/Shared/Documentation/DocSets so that Xcode will find
-# it at startup.
-# See http://developer.apple.com/tools/creatingdocsetswithdoxygen.html
-# for more information.
-
-GENERATE_DOCSET        = NO
-
-# When GENERATE_DOCSET tag is set to YES, this tag determines the name of the
-# feed. A documentation feed provides an umbrella under which multiple
-# documentation sets from a single provider (such as a company or product suite)
-# can be grouped.
-
-DOCSET_FEEDNAME        = "OGRE API Reference"
-
-# When GENERATE_DOCSET tag is set to YES, this tag specifies a string that
-# should uniquely identify the documentation set bundle. This should be a
-# reverse domain-name style string, e.g. com.mycompany.MyDocSet. Doxygen
-# will append .docset to the name.
-
-DOCSET_BUNDLE_ID       = org.ogre3d.documentation.api_1_9
-
-# When GENERATE_PUBLISHER_ID tag specifies a string that should uniquely
-# identify the documentation publisher. This should be a reverse domain-name
-# style string, e.g. com.mycompany.MyDocSet.documentation.
-
-DOCSET_PUBLISHER_ID    = org.ogre3d.documentation.api_1_9
-
-# The GENERATE_PUBLISHER_NAME tag identifies the documentation publisher.
-
-DOCSET_PUBLISHER_NAME  = org.ogre3d
-
-# If the GENERATE_HTMLHELP tag is set to YES, additional index files
-# will be generated that can be used as input for tools like the
-# Microsoft HTML help workshop to generate a compiled HTML help file (.chm)
-# of the generated HTML documentation.
-
-GENERATE_HTMLHELP      = NO
-
-# If the GENERATE_HTMLHELP tag is set to YES, the CHM_FILE tag can
-# be used to specify the file name of the resulting .chm file. You
-# can add a path in front of the file if the result should not be
-# written to the html output directory.
-
-CHM_FILE               = OgreAPIReference_1.9.chm
-
-# If the GENERATE_HTMLHELP tag is set to YES, the HHC_LOCATION tag can
-# be used to specify the location (absolute path including file name) of
-# the HTML help compiler (hhc.exe). If non-empty doxygen will try to run
-# the HTML help compiler on the generated index.hhp.
-
-HHC_LOCATION           = api/
-
-# If the GENERATE_HTMLHELP tag is set to YES, the GENERATE_CHI flag
-# controls if a separate .chi index file is generated (YES) or that
-# it should be included in the master .chm file (NO).
-
-GENERATE_CHI           = NO
-
-# If the GENERATE_HTMLHELP tag is set to YES, the CHM_INDEX_ENCODING
-# is used to encode HtmlHelp index (hhk), content (hhc) and project file
-# content.
-
-CHM_INDEX_ENCODING     =
-
-# If the GENERATE_HTMLHELP tag is set to YES, the BINARY_TOC flag
-# controls whether a binary table of contents is generated (YES) or a
-# normal table of contents (NO) in the .chm file.
-
-BINARY_TOC             = NO
-
-# The TOC_EXPAND flag can be set to YES to add extra items for group members
-# to the contents of the HTML help documentation and to the tree view.
-
-TOC_EXPAND             = YES
-
-# If the GENERATE_QHP tag is set to YES and both QHP_NAMESPACE and
-# QHP_VIRTUAL_FOLDER are set, an additional index file will be generated
-# that can be used as input for Qt's qhelpgenerator to generate a
-# Qt Compressed Help (.qch) of the generated HTML documentation.
-
-GENERATE_QHP           = NO
-
-# If the QHG_LOCATION tag is specified, the QCH_FILE tag can
-# be used to specify the file name of the resulting .qch file.
-# The path specified is relative to the HTML output folder.
-
-QCH_FILE               = OgreAPIReference_1.9.qhc
-
-# The QHP_NAMESPACE tag specifies the namespace to use when generating
-# Qt Help Project output. For more information please see
-# http://doc.trolltech.com/qthelpproject.html#namespace
-
-QHP_NAMESPACE          = org.ogre3d.documentation.api_1_9
-
-# The QHP_VIRTUAL_FOLDER tag specifies the namespace to use when generating
-# Qt Help Project output. For more information please see
-# http://doc.trolltech.com/qthelpproject.html#virtual-folders
-
-QHP_VIRTUAL_FOLDER     = doc
-
-# If QHP_CUST_FILTER_NAME is set, it specifies the name of a custom filter to
-# add. For more information please see
-# http://doc.trolltech.com/qthelpproject.html#custom-filters
-
-QHP_CUST_FILTER_NAME   =
-
-# The QHP_CUST_FILT_ATTRS tag specifies the list of the attributes of the
-# custom filter to add. For more information please see
-# <a href="http://doc.trolltech.com/qthelpproject.html#custom-filters">
-# Qt Help Project / Custom Filters</a>.
-
-QHP_CUST_FILTER_ATTRS  =
-
-# The QHP_SECT_FILTER_ATTRS tag specifies the list of the attributes this
-# project's
-# filter section matches.
-# <a href="http://doc.trolltech.com/qthelpproject.html#filter-attributes">
-# Qt Help Project / Filter Attributes</a>.
-
-QHP_SECT_FILTER_ATTRS  =
-
-# If the GENERATE_QHP tag is set to YES, the QHG_LOCATION tag can
-# be used to specify the location of Qt's qhelpgenerator.
-# If non-empty doxygen will try to run qhelpgenerator on the generated
-# .qhp file.
-
-QHG_LOCATION           = api/
-
-# If the GENERATE_ECLIPSEHELP tag is set to YES, additional index files
-#  will be generated, which together with the HTML files, form an Eclipse help
-# plugin. To install this plugin and make it available under the help contents
-# menu in Eclipse, the contents of the directory containing the HTML and XML
-# files needs to be copied into the plugins directory of eclipse. The name of
-# the directory within the plugins directory should be the same as
-# the ECLIPSE_DOC_ID value. After copying Eclipse needs to be restarted before
-# the help appears.
-
-GENERATE_ECLIPSEHELP   = NO
-
-# A unique identifier for the eclipse help plugin. When installing the plugin
-# the directory name containing the HTML and XML files should also have
-# this name.
-
-ECLIPSE_DOC_ID         = org.ogre3d.documentation.api_1_9
 
 # The DISABLE_INDEX tag can be used to turn on/off the condensed index (tabs)
 # at top of each HTML page. The value NO (the default) enables the index and
@@ -1294,245 +1150,6 @@ SEARCHDATA_FILE        = searchdata.xml
 EXTRA_SEARCH_MAPPINGS  =
 
 #---------------------------------------------------------------------------
-# configuration options related to the LaTeX output
-#---------------------------------------------------------------------------
-
-# If the GENERATE_LATEX tag is set to YES (the default) Doxygen will
-# generate Latex output.
-
-GENERATE_LATEX         = NO
-
-# The LATEX_OUTPUT tag is used to specify where the LaTeX docs will be put.
-# If a relative path is entered the value of OUTPUT_DIRECTORY will be
-# put in front of it. If left blank `latex' will be used as the default path.
-
-LATEX_OUTPUT           = latex
-
-# The LATEX_CMD_NAME tag can be used to specify the LaTeX command name to be
-# invoked. If left blank `latex' will be used as the default command name.
-# Note that when enabling USE_PDFLATEX this option is only used for
-# generating bitmaps for formulas in the HTML output, but not in the
-# Makefile that is written to the output directory.
-
-LATEX_CMD_NAME         = latex
-
-# The MAKEINDEX_CMD_NAME tag can be used to specify the command name to
-# generate index for LaTeX. If left blank `makeindex' will be used as the
-# default command name.
-
-MAKEINDEX_CMD_NAME     = makeindex
-
-# If the COMPACT_LATEX tag is set to YES Doxygen generates more compact
-# LaTeX documents. This may be useful for small projects and may help to
-# save some trees in general.
-
-COMPACT_LATEX          = NO
-
-# The PAPER_TYPE tag can be used to set the paper type that is used
-# by the printer. Possible values are: a4, letter, legal and
-# executive. If left blank a4wide will be used.
-
-PAPER_TYPE             = a4
-
-# The EXTRA_PACKAGES tag can be to specify one or more names of LaTeX
-# packages that should be included in the LaTeX output.
-
-EXTRA_PACKAGES         =
-
-# The LATEX_HEADER tag can be used to specify a personal LaTeX header for
-# the generated latex document. The header should contain everything until
-# the first chapter. If it is left blank doxygen will generate a
-# standard header. Notice: only use this tag if you know what you are doing!
-
-LATEX_HEADER           =
-
-# The LATEX_FOOTER tag can be used to specify a personal LaTeX footer for
-# the generated latex document. The footer should contain everything after
-# the last chapter. If it is left blank doxygen will generate a
-# standard footer. Notice: only use this tag if you know what you are doing!
-
-LATEX_FOOTER           =
-
-# If the PDF_HYPERLINKS tag is set to YES, the LaTeX that is generated
-# is prepared for conversion to pdf (using ps2pdf). The pdf file will
-# contain links (just like the HTML output) instead of page references
-# This makes the output suitable for online browsing using a pdf viewer.
-
-PDF_HYPERLINKS         = YES
-
-# If the USE_PDFLATEX tag is set to YES, pdflatex will be used instead of
-# plain latex in the generated Makefile. Set this option to YES to get a
-# higher quality PDF documentation.
-
-USE_PDFLATEX           = YES
-
-# If the LATEX_BATCHMODE tag is set to YES, doxygen will add the \\batchmode.
-# command to the generated LaTeX files. This will instruct LaTeX to keep
-# running if errors occur, instead of asking the user for help.
-# This option is also used when generating formulas in HTML.
-
-LATEX_BATCHMODE        = NO
-
-# If LATEX_HIDE_INDICES is set to YES then doxygen will not
-# include the index chapters (such as File Index, Compound Index, etc.)
-# in the output.
-
-LATEX_HIDE_INDICES     = NO
-
-# If LATEX_SOURCE_CODE is set to YES then doxygen will include
-# source code with syntax highlighting in the LaTeX output.
-# Note that which sources are shown also depends on other settings
-# such as SOURCE_BROWSER.
-
-LATEX_SOURCE_CODE      = NO
-
-# The LATEX_BIB_STYLE tag can be used to specify the style to use for the
-# bibliography, e.g. plainnat, or ieeetr. The default style is "plain". See
-# http://en.wikipedia.org/wiki/BibTeX for more info.
-
-LATEX_BIB_STYLE        = plain
-
-#---------------------------------------------------------------------------
-# configuration options related to the RTF output
-#---------------------------------------------------------------------------
-
-# If the GENERATE_RTF tag is set to YES Doxygen will generate RTF output
-# The RTF output is optimized for Word 97 and may not look very pretty with
-# other RTF readers or editors.
-
-GENERATE_RTF           = NO
-
-# The RTF_OUTPUT tag is used to specify where the RTF docs will be put.
-# If a relative path is entered the value of OUTPUT_DIRECTORY will be
-# put in front of it. If left blank `rtf' will be used as the default path.
-
-RTF_OUTPUT             = rtf
-
-# If the COMPACT_RTF tag is set to YES Doxygen generates more compact
-# RTF documents. This may be useful for small projects and may help to
-# save some trees in general.
-
-COMPACT_RTF            = NO
-
-# If the RTF_HYPERLINKS tag is set to YES, the RTF that is generated
-# will contain hyperlink fields. The RTF file will
-# contain links (just like the HTML output) instead of page references.
-# This makes the output suitable for online browsing using WORD or other
-# programs which support those fields.
-# Note: wordpad (write) and others do not support links.
-
-RTF_HYPERLINKS         = NO
-
-# Load style sheet definitions from file. Syntax is similar to doxygen's
-# config file, i.e. a series of assignments. You only have to provide
-# replacements, missing definitions are set to their default value.
-
-RTF_STYLESHEET_FILE    =
-
-# Set optional variables used in the generation of an rtf document.
-# Syntax is similar to doxygen's config file.
-
-RTF_EXTENSIONS_FILE    =
-
-#---------------------------------------------------------------------------
-# configuration options related to the man page output
-#---------------------------------------------------------------------------
-
-# If the GENERATE_MAN tag is set to YES (the default) Doxygen will
-# generate man pages
-
-GENERATE_MAN           = NO
-
-# The MAN_OUTPUT tag is used to specify where the man pages will be put.
-# If a relative path is entered the value of OUTPUT_DIRECTORY will be
-# put in front of it. If left blank `man' will be used as the default path.
-
-MAN_OUTPUT             = man
-
-# The MAN_EXTENSION tag determines the extension that is added to
-# the generated man pages (default is the subroutine's section .3)
-
-MAN_EXTENSION          = .3
-
-# If the MAN_LINKS tag is set to YES and Doxygen generates man output,
-# then it will generate one additional man file for each entity
-# documented in the real man page(s). These additional files
-# only source the real man page, but without them the man command
-# would be unable to find the correct page. The default is NO.
-
-MAN_LINKS              = NO
-
-#---------------------------------------------------------------------------
-# configuration options related to the XML output
-#---------------------------------------------------------------------------
-
-# If the GENERATE_XML tag is set to YES Doxygen will
-# generate an XML file that captures the structure of
-# the code including all documentation.
-
-GENERATE_XML           = NO
-
-# The XML_OUTPUT tag is used to specify where the XML pages will be put.
-# If a relative path is entered the value of OUTPUT_DIRECTORY will be
-# put in front of it. If left blank `xml' will be used as the default path.
-
-XML_OUTPUT             = xml
-
-# If the XML_PROGRAMLISTING tag is set to YES Doxygen will
-# dump the program listings (including syntax highlighting
-# and cross-referencing information) to the XML output. Note that
-# enabling this will significantly increase the size of the XML output.
-
-XML_PROGRAMLISTING     = YES
-
-#---------------------------------------------------------------------------
-# configuration options for the AutoGen Definitions output
-#---------------------------------------------------------------------------
-
-# If the GENERATE_AUTOGEN_DEF tag is set to YES Doxygen will
-# generate an AutoGen Definitions (see autogen.sf.net) file
-# that captures the structure of the code including all
-# documentation. Note that this feature is still experimental
-# and incomplete at the moment.
-
-GENERATE_AUTOGEN_DEF   = NO
-
-#---------------------------------------------------------------------------
-# configuration options related to the Perl module output
-#---------------------------------------------------------------------------
-
-# If the GENERATE_PERLMOD tag is set to YES Doxygen will
-# generate a Perl module file that captures the structure of
-# the code including all documentation. Note that this
-# feature is still experimental and incomplete at the
-# moment.
-
-GENERATE_PERLMOD       = NO
-
-# If the PERLMOD_LATEX tag is set to YES Doxygen will generate
-# the necessary Makefile rules, Perl scripts and LaTeX code to be able
-# to generate PDF and DVI output from the Perl module output.
-
-PERLMOD_LATEX          = NO
-
-# If the PERLMOD_PRETTY tag is set to YES the Perl module output will be
-# nicely formatted so it can be parsed by a human reader.
-# This is useful
-# if you want to understand what is going on.
-# On the other hand, if this
-# tag is set to NO the size of the Perl module output will be much smaller
-# and Perl will parse it just the same.
-
-PERLMOD_PRETTY         = YES
-
-# The names of the make variables in the generated doxyrules.make file
-# are prefixed with the string contained in PERLMOD_MAKEVAR_PREFIX.
-# This is useful so different doxyrules.make files included by the same
-# Makefile don't overwrite each other's variables.
-
-PERLMOD_MAKEVAR_PREFIX =
-
-#---------------------------------------------------------------------------
 # Configuration options related to the preprocessor
 #---------------------------------------------------------------------------
 
@@ -1587,6 +1204,7 @@ PREDEFINED             = OGRE_MEMORY_ALLOCATOR=1 \
                          OGRE_PLATFORM=10 \
                          OGRE_DEPRECATED= \
                          MANAGED_RESOURCE= \
+                         OGRE_RESOURCE_GROUP_INIT==RGN_DEFAULT \
                          protected=private
 
 # If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then
@@ -1626,7 +1244,7 @@ TAGFILES               =
 # When a file name is specified after GENERATE_TAGFILE, doxygen will create
 # a tag file that is based on the input files it reads.
 
-GENERATE_TAGFILE       = "${OGRE_BINARY_DIR}/api/Ogre.tag"
+GENERATE_TAGFILE       = "${PROJECT_BINARY_DIR}/api/Ogre.tag"
 
 # If the ALLEXTERNALS tag is set to YES all external classes will be listed
 # in the class index. If set to NO only the inherited external classes

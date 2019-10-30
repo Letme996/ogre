@@ -1,5 +1,6 @@
 #include "OgreStaticPluginLoader.h"
 #include "OgreBuildSettings.h"
+#include "OgreComponents.h"
 #include "OgreRoot.h"
 #include "OgrePlugin.h"
 
@@ -79,6 +80,9 @@
 #ifdef OGRE_BUILD_PLUGIN_STBI
 #   include "OgreSTBICodec.h"
 #endif
+#ifdef OGRE_BUILD_PLUGIN_DOT_SCENE
+#   include "OgreDotSceneLoader.h"
+#endif
 #if defined(OGRE_BUILD_PLUGIN_FREEIMAGE) && !defined(OGRE_BUILD_PLUGIN_STBI)
 #   include "OgreFreeImageCodec.h"
 #endif
@@ -136,6 +140,10 @@ void OgreBites::StaticPluginLoader::load()
 #endif
 #ifdef OGRE_BUILD_PLUGIN_STBI
     plugin = OGRE_NEW STBIPlugin();
+    mPlugins.push_back(plugin);
+#endif
+#ifdef OGRE_BUILD_PLUGIN_DOT_SCENE
+    plugin = OGRE_NEW DotScenePlugin();
     mPlugins.push_back(plugin);
 #endif
 #if defined(OGRE_BUILD_PLUGIN_FREEIMAGE) && !defined(OGRE_BUILD_PLUGIN_STBI)

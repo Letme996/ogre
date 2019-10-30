@@ -36,9 +36,10 @@ THE SOFTWARE.
 #include "OgreDepthBuffer.h"
 #include "OgreIteratorWrappers.h"
 #include "OgreHardwareOcclusionQuery.h"
+#include "OgreComponents.h"
 
 #ifdef OGRE_BUILD_COMPONENT_RTSHADERSYSTEM
-#include <OgreRTShaderConfig.h>
+#include "OgreRTShaderConfig.h"
 #endif
 
 namespace Ogre {
@@ -55,11 +56,11 @@ namespace Ogre {
         // This means CULL clockwise vertices, i.e. front of poly is counter-clockwise
         // This makes it the same as OpenGL and other right-handed systems
         , mCullingMode(CULL_CLOCKWISE)
-        , mWBuffer(false)
         , mBatchCount(0)
         , mFaceCount(0)
         , mVertexCount(0)
         , mInvertVertexWinding(false)
+        , mIsReverseDepthBufferEnabled(false)
         , mDisabledTexUnitsFrom(0)
         , mCurrentPassIterationCount(0)
         , mCurrentPassIterationNum(0)
@@ -86,6 +87,65 @@ namespace Ogre {
         mEventNames.push_back("RenderSystemCapabilitiesCreated");
     }
 
+    void RenderSystem::initFixedFunctionParams()
+    {
+        if(mFixedFunctionParams)
+            return;
+
+        GpuLogicalBufferStructPtr nullPtr;
+        GpuLogicalBufferStructPtr logicalBufferStruct(new GpuLogicalBufferStruct());
+        mFixedFunctionParams.reset(new GpuProgramParameters);
+        mFixedFunctionParams->_setLogicalIndexes(logicalBufferStruct, nullPtr, nullPtr);
+        mFixedFunctionParams->setAutoConstant(0, GpuProgramParameters::ACT_WORLD_MATRIX);
+        mFixedFunctionParams->setAutoConstant(4, GpuProgramParameters::ACT_VIEW_MATRIX);
+        mFixedFunctionParams->setAutoConstant(8, GpuProgramParameters::ACT_PROJECTION_MATRIX);
+        mFixedFunctionParams->setAutoConstant(12, GpuProgramParameters::ACT_SURFACE_AMBIENT_COLOUR);
+        mFixedFunctionParams->setAutoConstant(13, GpuProgramParameters::ACT_SURFACE_DIFFUSE_COLOUR);
+        mFixedFunctionParams->setAutoConstant(14, GpuProgramParameters::ACT_SURFACE_SPECULAR_COLOUR);
+        mFixedFunctionParams->setAutoConstant(15, GpuProgramParameters::ACT_SURFACE_EMISSIVE_COLOUR);
+        mFixedFunctionParams->setAutoConstant(16, GpuProgramParameters::ACT_SURFACE_SHININESS);
+        mFixedFunctionParams->setAutoConstant(17, GpuProgramParameters::ACT_POINT_PARAMS);
+        mFixedFunctionParams->setConstant(18, Vector4::ZERO); // ACT_FOG_PARAMS
+        mFixedFunctionParams->setConstant(19, Vector4::ZERO); // ACT_FOG_COLOUR
+        mFixedFunctionParams->setAutoConstant(20, GpuProgramParameters::ACT_AMBIENT_LIGHT_COLOUR);
+
+        // allocate per light parameters. slots 21..69
+        for(int i = 0; i < OGRE_MAX_SIMULTANEOUS_LIGHTS; i++)
+        {
+            size_t light_offset = 21 + i * 6;
+            mFixedFunctionParams->setConstant(light_offset + 0, Vector4::ZERO); // position
+            mFixedFunctionParams->setConstant(light_offset + 1, Vector4::ZERO); // direction
+            mFixedFunctionParams->setConstant(light_offset + 2, Vector4::ZERO); // diffuse
+            mFixedFunctionParams->setConstant(light_offset + 3, Vector4::ZERO); // specular
+            mFixedFunctionParams->setConstant(light_offset + 4, Vector4::ZERO); // attenuation
+            mFixedFunctionParams->setConstant(light_offset + 5, Vector4::ZERO); // spotlight
+        }
+    }
+
+    void RenderSystem::setFFPLightParams(size_t index, bool enabled)
+    {
+        if(!mFixedFunctionParams)
+            return;
+
+        size_t light_offset = 21 + 6 * index;
+        if (!enabled)
+        {
+            mFixedFunctionParams->clearAutoConstant(light_offset + 0);
+            mFixedFunctionParams->clearAutoConstant(light_offset + 1);
+            mFixedFunctionParams->clearAutoConstant(light_offset + 2);
+            mFixedFunctionParams->clearAutoConstant(light_offset + 3);
+            mFixedFunctionParams->clearAutoConstant(light_offset + 4);
+            mFixedFunctionParams->clearAutoConstant(light_offset + 5);
+            return;
+        }
+        mFixedFunctionParams->setAutoConstant(light_offset + 0, GpuProgramParameters::ACT_LIGHT_POSITION, index);
+        mFixedFunctionParams->setAutoConstant(light_offset + 1, GpuProgramParameters::ACT_LIGHT_DIRECTION, index);
+        mFixedFunctionParams->setAutoConstant(light_offset + 2, GpuProgramParameters::ACT_LIGHT_DIFFUSE_COLOUR, index);
+        mFixedFunctionParams->setAutoConstant(light_offset + 3, GpuProgramParameters::ACT_LIGHT_SPECULAR_COLOUR, index);
+        mFixedFunctionParams->setAutoConstant(light_offset + 4, GpuProgramParameters::ACT_LIGHT_ATTENUATION, index);
+        mFixedFunctionParams->setAutoConstant(light_offset + 5, GpuProgramParameters::ACT_SPOTLIGHT_PARAMS, index);
+    }
+
     //-----------------------------------------------------------------------
     RenderSystem::~RenderSystem()
     {
@@ -95,6 +155,79 @@ namespace Ogre {
         // Current capabilities managed externally
         mCurrentCapabilities = 0;
     }
+
+    RenderWindowDescription RenderSystem::getRenderWindowDescription() const
+    {
+        RenderWindowDescription ret;
+        auto& miscParams = ret.miscParams;
+
+        auto end = mOptions.end();
+
+        auto opt = mOptions.find("Full Screen");
+        if (opt == end)
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "Can't find 'Full Screen' option");
+
+        ret.useFullScreen = StringConverter::parseBool(opt->second.currentValue);
+
+        opt = mOptions.find("Video Mode");
+        if (opt == end)
+            OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "Can't find 'Video Mode' option");
+
+        StringStream mode(opt->second.currentValue);
+        String token;
+
+        mode >> ret.width;
+        mode >> token; // 'x' as seperator between width and height
+        mode >> ret.height;
+
+        // backend specific options. Presence determined by getConfigOptions
+        mode >> token; // '@' as seperator between bpp on D3D
+        if(!mode.eof())
+        {
+            uint32 bpp;
+            mode >> bpp;
+            miscParams.emplace("colourDepth", std::to_string(bpp));
+        }
+
+        if((opt = mOptions.find("FSAA")) != end)
+        {
+            StringStream fsaaMode(opt->second.currentValue);
+            uint32_t fsaa;
+            fsaaMode >> fsaa;
+            miscParams.emplace("FSAA", std::to_string(fsaa));
+
+            // D3D specific
+            String hint;
+            fsaaMode >> hint;
+            if(!fsaaMode.eof())
+                miscParams.emplace("FSAAHint", hint);
+        }
+
+        if((opt = mOptions.find("VSync")) != end)
+            miscParams.emplace("vsync", opt->second.currentValue);
+
+        if((opt = mOptions.find("sRGB Gamma Conversion")) != end)
+            miscParams.emplace("gamma", opt->second.currentValue);
+
+        if((opt = mOptions.find("Colour Depth")) != end)
+            miscParams.emplace("colourDepth", opt->second.currentValue);
+
+        if((opt = mOptions.find("VSync Interval")) != end)
+            miscParams.emplace("vsyncInterval", opt->second.currentValue);
+
+        if((opt = mOptions.find("Display Frequency")) != end)
+            miscParams.emplace("displayFrequency", opt->second.currentValue);
+
+        if((opt = mOptions.find("Content Scaling Factor")) != end)
+            miscParams["contentScalingFactor"] = opt->second.currentValue;
+
+#if OGRE_NO_QUAD_BUFFER_STEREO == 0
+        if((opt = mOptions.find("Stereo Mode")) != end)
+            miscParams["stereoMode"] = opt->second.currentValue;
+#endif
+        return ret;
+    }
+
     //-----------------------------------------------------------------------
     void RenderSystem::_initRenderTargets(void)
     {
@@ -125,6 +258,7 @@ namespace Ogre {
     //-----------------------------------------------------------------------
     void RenderSystem::_swapAllRenderTargetBuffers()
     {
+        OgreProfile("_swapAllRenderTargetBuffers");
         // Update all in order of priority
         // This ensures render-to-texture targets get updated before render windows
         RenderTargetPriorityMap::iterator itarg, itargend;
@@ -136,7 +270,7 @@ namespace Ogre {
         }
     }
     //-----------------------------------------------------------------------
-    RenderWindow* RenderSystem::_initialise(bool autoCreateWindow, const String& windowTitle)
+    void RenderSystem::_initialise()
     {
         // Have I been registered by call to Root::setRenderSystem?
         /** Don't do this anymore, just allow via Root
@@ -157,8 +291,6 @@ namespace Ogre {
         mTessellationHullProgramBound = false;
         mTessellationDomainProgramBound = false;
         mComputeProgramBound = false;
-
-        return 0;
     }
 
     //---------------------------------------------------------------------------------------------
@@ -254,9 +386,8 @@ namespace Ogre {
     {
         assert( target.getPriority() < OGRE_NUM_RENDERTARGET_GROUPS );
 
-        mRenderTargets.insert( RenderTargetMap::value_type( target.getName(), &target ) );
-        mPrioritisedRenderTargets.insert(
-            RenderTargetPriorityMap::value_type(target.getPriority(), &target ));
+        mRenderTargets.emplace(target.getName(), &target);
+        mPrioritisedRenderTargets.emplace(target.getPriority(), &target);
     }
 
     //---------------------------------------------------------------------------------------------
@@ -312,18 +443,14 @@ namespace Ogre {
     {
         // This method is only ever called to set a texture unit to valid details
         // The method _disableTextureUnit is called to turn a unit off
+        TexturePtr tex = tl._getTexturePtr();
+        if(!tex || tl.isTextureLoadFailing())
+            tex = mTextureManager->_getWarningTexture();
 
-        const TexturePtr& tex = tl._getTexturePtr();
-        bool isValidBinding = false;
-        
-        if (mCurrentCapabilities->hasCapability(RSC_COMPLETE_TEXTURE_BINDING))
-            _setBindingType(tl.getBindingType());
-
-        // Vertex texture binding?
+        // Vertex texture binding (D3D9 only)
         if (mCurrentCapabilities->hasCapability(RSC_VERTEX_TEXTURE_FETCH) &&
             !mCurrentCapabilities->getVertexTextureUnitsShared())
         {
-            isValidBinding = true;
             if (tl.getBindingType() == TextureUnitState::BT_VERTEX)
             {
                 // Bind vertex texture
@@ -339,84 +466,7 @@ namespace Ogre {
                 _setTexture(texUnit, true, tex);
             }
         }
-
-        if (mCurrentCapabilities->hasCapability(RSC_GEOMETRY_PROGRAM))
-        {
-            isValidBinding = true;
-            if (tl.getBindingType() == TextureUnitState::BT_GEOMETRY)
-            {
-                // Bind vertex texture
-                _setGeometryTexture(texUnit, tex);
-                // bind nothing to fragment unit (hardware isn't shared but fragment
-                // unit can't be using the same index
-                _setTexture(texUnit, true, sNullTexPtr);
-            }
-            else
-            {
-                // vice versa
-                _setGeometryTexture(texUnit, sNullTexPtr);
-                _setTexture(texUnit, true, tex);
-            }
-        }
-
-        if (mCurrentCapabilities->hasCapability(RSC_COMPUTE_PROGRAM))
-        {
-            isValidBinding = true;
-            if (tl.getBindingType() == TextureUnitState::BT_COMPUTE)
-            {
-                // Bind vertex texture
-                _setComputeTexture(texUnit, tex);
-                // bind nothing to fragment unit (hardware isn't shared but fragment
-                // unit can't be using the same index
-                _setTexture(texUnit, true, sNullTexPtr);
-            }
-            else
-            {
-                // vice versa
-                _setComputeTexture(texUnit, sNullTexPtr);
-                _setTexture(texUnit, true, tex);
-            }
-        }
-
-        if (mCurrentCapabilities->hasCapability(RSC_TESSELLATION_DOMAIN_PROGRAM))
-        {
-            isValidBinding = true;
-            if (tl.getBindingType() == TextureUnitState::BT_TESSELLATION_DOMAIN)
-            {
-                // Bind vertex texture
-                _setTesselationDomainTexture(texUnit, tex);
-                // bind nothing to fragment unit (hardware isn't shared but fragment
-                // unit can't be using the same index
-                _setTexture(texUnit, true, sNullTexPtr);
-            }
-            else
-            {
-                // vice versa
-                _setTesselationDomainTexture(texUnit, sNullTexPtr);
-                _setTexture(texUnit, true, tex);
-            }
-        }
-
-        if (mCurrentCapabilities->hasCapability(RSC_TESSELLATION_HULL_PROGRAM))
-        {
-            isValidBinding = true;
-            if (tl.getBindingType() == TextureUnitState::BT_TESSELLATION_HULL)
-            {
-                // Bind vertex texture
-                _setTesselationHullTexture(texUnit, tex);
-                // bind nothing to fragment unit (hardware isn't shared but fragment
-                // unit can't be using the same index
-                _setTexture(texUnit, true, sNullTexPtr);
-            }
-            else
-            {
-                // vice versa
-                _setTesselationHullTexture(texUnit, sNullTexPtr);
-                _setTexture(texUnit, true, tex);
-            }
-        }
-
-        if (!isValidBinding)
+        else
         {
             // Shared vertex / fragment textures or no vertex texture support
             // Bind texture (may be blank)
@@ -426,39 +476,12 @@ namespace Ogre {
         // Set texture coordinate set
         _setTextureCoordSet(texUnit, tl.getTextureCoordSet());
 
-        //Set texture layer compare state and function 
-        _setTextureUnitCompareEnabled(texUnit,tl.getTextureCompareEnabled());
-        _setTextureUnitCompareFunction(texUnit,tl.getTextureCompareFunction());
-
-
-        // Set texture layer filtering
-        _setTextureUnitFiltering(texUnit, 
-            tl.getTextureFiltering(FT_MIN), 
-            tl.getTextureFiltering(FT_MAG), 
-            tl.getTextureFiltering(FT_MIP));
-
-        // Set texture layer filtering
-        _setTextureLayerAnisotropy(texUnit, tl.getTextureAnisotropy());
-
-        // Set mipmap biasing
-        _setTextureMipmapBias(texUnit, tl.getTextureMipmapBias());
+        _setSampler(texUnit, *tl.getSampler());
 
         // Set blend modes
         // Note, colour before alpha is important
         _setTextureBlendMode(texUnit, tl.getColourBlendMode());
         _setTextureBlendMode(texUnit, tl.getAlphaBlendMode());
-
-        // Texture addressing mode
-        const TextureUnitState::UVWAddressingMode& uvw = tl.getTextureAddressingMode();
-        _setTextureAddressingMode(texUnit, uvw);
-
-        // Set texture border colour only if required
-        if (uvw.u == TextureUnitState::TAM_BORDER ||
-            uvw.v == TextureUnitState::TAM_BORDER ||
-            uvw.w == TextureUnitState::TAM_BORDER)
-        {
-            _setTextureBorderColour(texUnit, tl.getTextureBorderColour());
-        }
 
         // Set texture effects
         TextureUnitState::EffectMap::iterator effi;
@@ -515,13 +538,6 @@ namespace Ogre {
 
     }
     //-----------------------------------------------------------------------
-    void RenderSystem::_setBindingType(TextureUnitState::BindingType bindingType)
-    {
-        OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED, 
-            "This rendersystem does not support binding texture to other shaders then fragment", 
-            "RenderSystem::_setBindingType");
-    }
-    //-----------------------------------------------------------------------
     void RenderSystem::_setVertexTexture(size_t unit, const TexturePtr& tex)
     {
         OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED, 
@@ -529,42 +545,6 @@ namespace Ogre {
             "you should use the regular texture samplers which are shared between "
             "the vertex and fragment units.", 
             "RenderSystem::_setVertexTexture");
-    }
-    //-----------------------------------------------------------------------
-    void RenderSystem::_setGeometryTexture(size_t unit, const TexturePtr& tex)
-    {
-        OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED, 
-            "This rendersystem does not support separate geometry texture samplers, "
-            "you should use the regular texture samplers which are shared between "
-            "the vertex and fragment units.", 
-            "RenderSystem::_setGeometryTexture");
-    }
-    //-----------------------------------------------------------------------
-    void RenderSystem::_setComputeTexture(size_t unit, const TexturePtr& tex)
-    {
-        OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED, 
-            "This rendersystem does not support separate compute texture samplers, "
-            "you should use the regular texture samplers which are shared between "
-            "the vertex and fragment units.", 
-            "RenderSystem::_setComputeTexture");
-    }
-    //-----------------------------------------------------------------------
-    void RenderSystem::_setTesselationHullTexture(size_t unit, const TexturePtr& tex)
-    {
-        OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED, 
-            "This rendersystem does not support separate tesselation hull texture samplers, "
-            "you should use the regular texture samplers which are shared between "
-            "the vertex and fragment units.", 
-            "RenderSystem::_setTesselationHullTexture");
-    }
-    //-----------------------------------------------------------------------
-    void RenderSystem::_setTesselationDomainTexture(size_t unit, const TexturePtr& tex)
-    {
-        OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED, 
-            "This rendersystem does not support separate tesselation domain texture samplers, "
-            "you should use the regular texture samplers which are shared between "
-            "the vertex and fragment units.", 
-            "RenderSystem::_setTesselationDomainTexture");
     }
     //-----------------------------------------------------------------------
     void RenderSystem::_disableTextureUnit(size_t texUnit)
@@ -656,14 +636,10 @@ namespace Ogre {
                                                        "for RT: " + renderTarget->getName());
         }
     }
-    bool RenderSystem::getWBufferEnabled(void) const
-    {
-        return mWBuffer;
-    }
     //-----------------------------------------------------------------------
-    void RenderSystem::setWBufferEnabled(bool enabled)
+    bool RenderSystem::isReverseDepthBufferEnabled() const
     {
-        mWBuffer = enabled;
+        return mIsReverseDepthBufferEnabled;
     }
     //-----------------------------------------------------------------------
     void RenderSystem::shutdown(void)
@@ -700,6 +676,23 @@ namespace Ogre {
         mRenderTargets.clear();
 
         mPrioritisedRenderTargets.clear();
+    }
+
+    void RenderSystem::_setProjectionMatrix(Matrix4 m)
+    {
+        if (!mFixedFunctionParams) return;
+
+        if (mActiveRenderTarget->requiresTextureFlipping())
+        {
+            // Invert transformed y
+            m[1][0] = -m[1][0];
+            m[1][1] = -m[1][1];
+            m[1][2] = -m[1][2];
+            m[1][3] = -m[1][3];
+        }
+
+        mFixedFunctionParams->setConstant(8, m);
+        applyFixedFunctionParams(mFixedFunctionParams, GPV_GLOBAL);
     }
     //-----------------------------------------------------------------------
     void RenderSystem::_beginGeometryCount(void)
@@ -752,45 +745,17 @@ namespace Ogre {
         case RenderOperation::OT_TRIANGLE_LIST:
             mFaceCount += (val / 3);
             break;
+        case RenderOperation::OT_TRIANGLE_LIST_ADJ:
+            mFaceCount += (val / 6);
+            break;
+        case RenderOperation::OT_TRIANGLE_STRIP_ADJ:
+            mFaceCount += (val / 2 - 2);
+            break;
         case RenderOperation::OT_TRIANGLE_STRIP:
         case RenderOperation::OT_TRIANGLE_FAN:
             mFaceCount += (val - 2);
             break;
-        case RenderOperation::OT_POINT_LIST:
-        case RenderOperation::OT_LINE_LIST:
-        case RenderOperation::OT_LINE_STRIP:
-        case RenderOperation::OT_PATCH_1_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_2_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_3_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_4_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_5_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_6_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_7_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_8_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_9_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_10_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_11_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_12_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_13_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_14_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_15_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_16_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_17_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_18_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_19_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_20_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_21_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_22_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_23_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_24_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_25_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_26_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_27_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_28_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_29_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_30_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_31_CONTROL_POINT:
-        case RenderOperation::OT_PATCH_32_CONTROL_POINT:
+        default:
             break;
         }
 
@@ -805,13 +770,6 @@ namespace Ogre {
             mClipPlanesDirty = false;
         }
     }
-    void RenderSystem::_renderUsingReadBackAsTexture(unsigned int secondPass,Ogre::String variableName,unsigned int StartSlot)
-    {
-        OGRE_EXCEPT(Exception::ERR_NOT_IMPLEMENTED, 
-            "This rendersystem does not support reading back the inactive depth/stencil \
-            buffer as a texture. Only DirectX 11 Render System supports it.",
-            "RenderSystem::_renderUsingReadBackAsTexture"); 
-    }
     //-----------------------------------------------------------------------
     void RenderSystem::setInvertVertexWinding(bool invert)
     {
@@ -823,26 +781,11 @@ namespace Ogre {
         return mInvertVertexWinding;
     }
     //---------------------------------------------------------------------
-    void RenderSystem::addClipPlane (const Plane &p)
-    {
-        mClipPlanes.push_back(p);
-        mClipPlanesDirty = true;
-    }
-    //---------------------------------------------------------------------
     void RenderSystem::setClipPlanes(const PlaneList& clipPlanes)
     {
         if (clipPlanes != mClipPlanes)
         {
             mClipPlanes = clipPlanes;
-            mClipPlanesDirty = true;
-        }
-    }
-    //---------------------------------------------------------------------
-    void RenderSystem::resetClipPlanes()
-    {
-        if (!mClipPlanes.empty())
-        {
-            mClipPlanes.clear();
             mClipPlanesDirty = true;
         }
     }
@@ -866,35 +809,38 @@ namespace Ogre {
 
         --mCurrentPassIterationCount;
         ++mCurrentPassIterationNum;
+
+        const uint16 mask = GPV_PASS_ITERATION_NUMBER;
+
         if (mActiveVertexGpuProgramParameters)
         {
             mActiveVertexGpuProgramParameters->incPassIterationNumber();
-            bindGpuProgramPassIterationParameters(GPT_VERTEX_PROGRAM);
+            bindGpuProgramParameters(GPT_VERTEX_PROGRAM, mActiveVertexGpuProgramParameters, mask);
         }
         if (mActiveGeometryGpuProgramParameters)
         {
             mActiveGeometryGpuProgramParameters->incPassIterationNumber();
-            bindGpuProgramPassIterationParameters(GPT_GEOMETRY_PROGRAM);
+            bindGpuProgramParameters(GPT_GEOMETRY_PROGRAM, mActiveGeometryGpuProgramParameters, mask);
         }
         if (mActiveFragmentGpuProgramParameters)
         {
             mActiveFragmentGpuProgramParameters->incPassIterationNumber();
-            bindGpuProgramPassIterationParameters(GPT_FRAGMENT_PROGRAM);
+            bindGpuProgramParameters(GPT_FRAGMENT_PROGRAM, mActiveFragmentGpuProgramParameters, mask);
         }
         if (mActiveTessellationHullGpuProgramParameters)
         {
             mActiveTessellationHullGpuProgramParameters->incPassIterationNumber();
-            bindGpuProgramPassIterationParameters(GPT_HULL_PROGRAM);
+            bindGpuProgramParameters(GPT_HULL_PROGRAM, mActiveTessellationHullGpuProgramParameters, mask);
         }
         if (mActiveTessellationDomainGpuProgramParameters)
         {
             mActiveTessellationDomainGpuProgramParameters->incPassIterationNumber();
-            bindGpuProgramPassIterationParameters(GPT_DOMAIN_PROGRAM);
+            bindGpuProgramParameters(GPT_DOMAIN_PROGRAM, mActiveTessellationDomainGpuProgramParameters, mask);
         }
         if (mActiveComputeGpuProgramParameters)
         {
             mActiveComputeGpuProgramParameters->incPassIterationNumber();
-            bindGpuProgramPassIterationParameters(GPT_COMPUTE_PROGRAM);
+            bindGpuProgramParameters(GPT_COMPUTE_PROGRAM, mActiveComputeGpuProgramParameters, mask);
         }
         return true;
     }
@@ -1064,7 +1010,7 @@ namespace Ogre {
     //---------------------------------------------------------------------
     void RenderSystem::setGlobalInstanceVertexBuffer( const HardwareVertexBufferSharedPtr &val )
     {
-        if ( val && !val->getIsInstanceData() )
+        if ( val && !val->isInstanceData() )
         {
             OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, 
                         "A none instance data vertex buffer was set to be the global instance vertex buffer.",
@@ -1096,6 +1042,45 @@ namespace Ogre {
     void RenderSystem::getCustomAttribute(const String& name, void* pData)
     {
         OGRE_EXCEPT(Exception::ERR_INVALIDPARAMS, "Attribute not found.", "RenderSystem::getCustomAttribute");
+    }
+
+    void RenderSystem::initConfigOptions()
+    {
+        // FS setting possibilities
+        ConfigOption optFullScreen;
+        optFullScreen.name = "Full Screen";
+        optFullScreen.possibleValues.push_back( "No" );
+        optFullScreen.possibleValues.push_back( "Yes" );
+        optFullScreen.currentValue = optFullScreen.possibleValues[0];
+        optFullScreen.immutable = false;
+        mOptions[optFullScreen.name] = optFullScreen;
+
+        ConfigOption optVSync;
+        optVSync.name = "VSync";
+        optVSync.immutable = false;
+        optVSync.possibleValues.push_back("No");
+        optVSync.possibleValues.push_back("Yes");
+        optVSync.currentValue = optVSync.possibleValues[1];
+        mOptions[optVSync.name] = optVSync;
+
+        ConfigOption optSRGB;
+        optSRGB.name = "sRGB Gamma Conversion";
+        optSRGB.immutable = false;
+        optSRGB.possibleValues.push_back("No");
+        optSRGB.possibleValues.push_back("Yes");
+        optSRGB.currentValue = optSRGB.possibleValues[0];
+        mOptions[optSRGB.name] = optSRGB;
+
+#if OGRE_NO_QUAD_BUFFER_STEREO == 0
+        ConfigOption optStereoMode;
+        optStereoMode.name = "Stereo Mode";
+        optStereoMode.possibleValues.push_back(StringConverter::toString(SMT_NONE));
+        optStereoMode.possibleValues.push_back(StringConverter::toString(SMT_FRAME_SEQUENTIAL));
+        optStereoMode.currentValue = optStereoMode.possibleValues[0];
+        optStereoMode.immutable = false;
+
+        mOptions[optStereoMode.name] = optStereoMode;
+#endif
     }
 }
 

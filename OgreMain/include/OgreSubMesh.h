@@ -105,10 +105,10 @@ namespace Ogre {
                 The use of shared or non-shared index map is determined when
                 model data is converted to the OGRE .mesh format.
         */
-        typedef vector<unsigned short>::type IndexMap;
+        typedef std::vector<unsigned short> IndexMap;
         IndexMap blendIndexToBoneIndexMap;
 
-        typedef vector<IndexData*>::type LODFaceList;
+        typedef std::vector<IndexData*> LODFaceList;
         LODFaceList mLodFaceList;
 
         /** A list of extreme points on the submesh (optional).
@@ -130,7 +130,7 @@ namespace Ogre {
                 If this array is empty, submesh sorting is done like in older versions -
                 by comparing the positions of the owning entity.
          */
-        vector<Vector3>::type extremityPoints;
+        std::vector<Vector3> extremityPoints;
 
         /// Reference to parent Mesh (not a smart pointer so child does not keep parent alive).
         Mesh* parent;
@@ -139,9 +139,11 @@ namespace Ogre {
         void setMaterialName(const String& matName, const String& groupName = ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME );
         const String& getMaterialName(void) const;
 
-        /** Returns true if a material has been assigned to the submesh, otherwise returns false.
-        */
-        bool isMatInitialised(void) const;
+        void setMaterial(const MaterialPtr& mat) { mMaterial = mat; }
+        const MaterialPtr& getMaterial() const { return mMaterial; }
+
+        /// @deprecated use getMaterial() instead
+        OGRE_DEPRECATED bool isMatInitialised(void) const { return bool(mMaterial); }
 
         /** Returns a RenderOperation structure required to render this mesh.
             @param 
@@ -173,7 +175,7 @@ namespace Ogre {
         void clearBoneAssignments(void);
 
         /// Multimap of verex bone assignments (orders by vertex index)
-        typedef multimap<size_t, VertexBoneAssignment>::type VertexBoneAssignmentList;
+        typedef std::multimap<size_t, VertexBoneAssignment> VertexBoneAssignmentList;
         typedef MapIterator<VertexBoneAssignmentList> BoneAssignmentIterator;
 
         /** Gets an iterator for access all bone assignments. 
@@ -263,11 +265,8 @@ namespace Ogre {
 
     protected:
 
-        /// Name of the material this SubMesh uses.
-        String mMaterialName;
-
-        /// Is there a material yet?
-        bool mMatInitialised;
+        /// the material this SubMesh uses.
+        MaterialPtr mMaterial;
 
         /// paired list of texture aliases and texture names
         AliasTextureNamePairList mTextureAliases;

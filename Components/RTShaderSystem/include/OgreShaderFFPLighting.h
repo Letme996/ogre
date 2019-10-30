@@ -28,7 +28,7 @@ THE SOFTWARE.
 #define _ShaderFFPLighting_
 
 #include "OgreShaderPrerequisites.h"
-#ifdef RTSHADER_SYSTEM_BUILD_CORE_SHADERS
+#if defined(RTSHADER_SYSTEM_BUILD_CORE_SHADERS) || defined(RTSHADER_SYSTEM_BUILD_EXT_SHADERS)
 #include "OgreShaderSubRenderState.h"
 #include "OgreLight.h"
 #include "OgreCommon.h"
@@ -70,7 +70,7 @@ public:
     /** 
     @see SubRenderState::updateGpuProgramsParams.
     */
-    virtual void updateGpuProgramsParams(Renderable* rend, Pass* pass, const AutoParamDataSource* source, const LightList* pLightList);
+    virtual void updateGpuProgramsParams(Renderable* rend, const Pass* pass, const AutoParamDataSource* source, const LightList* pLightList);
 
     /** 
     @see SubRenderState::copyFrom.
@@ -82,6 +82,11 @@ public:
     */
     virtual bool preAddToRenderState(const RenderState* renderState, Pass* srcPass, Pass* dstPass);
 
+    /** normalise the blinn-phong reflection model to make it energy conserving
+     *
+     * see [this for details](http://www.rorydriscoll.com/2009/01/25/energy-conservation-in-games/)
+     */
+    void setNormaliseEnabled(bool enable) { mNormalisedEnable = enable; }
 
     static String Type;
 
@@ -105,9 +110,19 @@ protected:
         // Specular colour.
         UniformParameterPtr mSpecularColour;
 
+        // for normal mapping:
+        /// light position direction (texture space for normal mapping, else same as mToLightDir).
+        ParameterPtr mToLight;
+        /// light direction (texture space for normal mapping, else same as mDirection).
+        ParameterPtr mPSInDirection;
+
+        /// Vertex shader output vertex position to light position direction (texture space).
+        ParameterPtr mVSOutToLightDir;
+        /// Vertex shader output light direction (texture space).
+        ParameterPtr mVSOutDirection;
     };
 
-    typedef vector<LightParams>::type               LightParamsList;
+    typedef std::vector<LightParams>               LightParamsList;
     typedef LightParamsList::iterator               LightParamsIterator;
     typedef LightParamsList::const_iterator         LightParamsConstIterator;
 
@@ -129,13 +144,13 @@ protected:
     Set the light count per light type that this sub render state will generate.
     @see ShaderGenerator::setLightCount.
     */
-    void setLightCount(const int lightCount[3]);
+    void setLightCount(const Vector3i& lightCount);
 
     /** 
     Get the light count per light type that this sub render state will generate.
     @see ShaderGenerator::getLightCount.
     */
-    void getLightCount(int lightCount[3]) const;
+    Vector3i getLightCount() const;
 
     /** 
     Set the specular component state. If set to true this sub render state will compute a specular
@@ -168,12 +183,12 @@ protected:
     /** 
     Internal method that adds global illumination component functions invocations.
     */
-    bool addGlobalIlluminationInvocation(Function* vsMain, const int groupOrder);
+    void addGlobalIlluminationInvocation(const FunctionStageRef& stage);
             
     /** 
     Internal method that adds per light illumination component functions invocations.
     */
-    bool addIlluminationInvocation(LightParams* curLightParams, Function* vsMain, const int groupOrder);
+    void addIlluminationInvocation(const LightParams* curLightParams, const FunctionStageRef& stage);
 
 
 // Attributes.
@@ -182,41 +197,41 @@ protected:
     TrackVertexColourType mTrackVertexColourType;
     // Specular component enabled/disabled.
     bool mSpecularEnable;
+    bool mNormalisedEnable;
     // Light list.
     LightParamsList mLightParamsList;
     // World view matrix parameter.
     UniformParameterPtr mWorldViewMatrix;
     // World view matrix inverse transpose parameter.
     UniformParameterPtr mWorldViewITMatrix;
+    // Transformed view normal
+    ParameterPtr mViewNormal;
+    // Transformed view position
+    ParameterPtr mViewPos;
+    // Transformed direction to light
+    ParameterPtr mToLight;
+    // Transformed direction to view
+    ParameterPtr mToView;
     // Vertex shader input position parameter.
     ParameterPtr mVSInPosition;
     // Vertex shader input normal.
     ParameterPtr mVSInNormal;
     // Vertex shader diffuse.
-    ParameterPtr mVSDiffuse;
+    ParameterPtr mInDiffuse;
     // Vertex shader output diffuse colour parameter.
-    ParameterPtr mVSOutDiffuse;
+    ParameterPtr mOutDiffuse;
     // Vertex shader output specular colour parameter.
-    ParameterPtr mVSOutSpecular;
+    ParameterPtr mOutSpecular;
     // Derived scene colour parameter.
     UniformParameterPtr mDerivedSceneColour;
     // Ambient light colour parameter.
     UniformParameterPtr mLightAmbientColour;
     // Derived ambient light colour parameter.
     UniformParameterPtr mDerivedAmbientLightColour;
-    // Surface ambient colour parameter.
-    UniformParameterPtr mSurfaceAmbientColour;
-    // Surface diffuse colour parameter.
-    UniformParameterPtr mSurfaceDiffuseColour;
-    // Surface specular colour parameter.
-    UniformParameterPtr mSurfaceSpecularColour;
     // Surface emissive colour parameter.
     UniformParameterPtr mSurfaceEmissiveColour;
     // Surface shininess parameter.
     UniformParameterPtr mSurfaceShininess;
-    // Shared blank light.
-    static Light msBlankLight;
-
 };
 
 

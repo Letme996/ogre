@@ -44,7 +44,7 @@ namespace Ogre
     void LodOutputProviderBuffer::bakeManualLodLevel( LodData* data, String& manualMeshName, int lodIndex )
     {
         // placeholder dummy
-        unsigned short submeshCount = ushort(mBuffer.submesh.size());
+        ushort submeshCount = Math::uint16Cast(mBuffer.submesh.size());
         LodIndexBuffer buffer;
         buffer.indexSize = 2;
         buffer.indexCount = 0;
@@ -63,11 +63,11 @@ namespace Ogre
 
     void LodOutputProviderBuffer::bakeLodLevel(LodData* data, int lodIndex)
     {
-        unsigned short submeshCount = ushort(mBuffer.submesh.size());
+        ushort submeshCount = Math::uint16Cast(mBuffer.submesh.size());
 
         // Create buffers.
         for (unsigned short i = 0; i < submeshCount; i++) {
-            vector<LodIndexBuffer>::type& lods = mBuffer.submesh[i].genIndexBuffers;
+            std::vector<LodIndexBuffer>& lods = mBuffer.submesh[i].genIndexBuffers;
             size_t indexCount = data->mIndexBufferInfoList[i].indexCount;
             lods.reserve(lods.size() + 1);
             LodIndexBuffer& curLod = *lods.insert(lods.begin() + lodIndex, LodIndexBuffer());
@@ -109,12 +109,12 @@ namespace Ogre
 
 void LodOutputProviderBuffer::inject()
 {
-    unsigned short submeshCount = ushort(mBuffer.submesh.size());
+    ushort submeshCount = Math::uint16Cast(mBuffer.submesh.size());
     OgreAssert(mMesh->getNumSubMeshes() == submeshCount, "");
     mMesh->removeLodLevels();
     for (unsigned short i = 0; i < submeshCount; i++) {
         SubMesh::LODFaceList& lods = mMesh->getSubMesh(i)->mLodFaceList;
-        typedef vector<LodIndexBuffer>::type GenBuffers;
+        typedef std::vector<LodIndexBuffer> GenBuffers;
         GenBuffers& buffers = mBuffer.submesh[i].genIndexBuffers;
 
         size_t buffCount = buffers.size();

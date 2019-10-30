@@ -46,7 +46,6 @@ namespace RTShader {
 #define SGX_LIB_INTEGRATEDPSSM                      "SGXLib_IntegratedPSSM"
 #define SGX_FUNC_COMPUTE_SHADOW_COLOUR3             "SGX_ComputeShadowFactor_PSSM3"
 #define SGX_FUNC_APPLYSHADOWFACTOR_DIFFUSE          "SGX_ApplyShadowFactor_Diffuse"
-#define SGX_FUNC_MODULATE_SCALAR                    "SGX_ModulateScalar"
 
 /** Integrated PSSM shadow receiver with 3 splits sub render state implementation.
 Derives from SubRenderState class.
@@ -56,7 +55,7 @@ class _OgreRTSSExport IntegratedPSSM3 : public SubRenderState
 
     // Interface.
 public:
-    typedef vector<Real>::type SplitPointList;
+    typedef std::vector<Real> SplitPointList;
 
     /** Class default constructor */    
     IntegratedPSSM3();
@@ -74,7 +73,7 @@ public:
     /** 
     @see SubRenderState::updateGpuProgramsParams.
     */
-    virtual void updateGpuProgramsParams(Renderable* rend, Pass* pass, const AutoParamDataSource* source, const LightList* pLightList);
+    virtual void updateGpuProgramsParams(Renderable* rend, const Pass* pass, const AutoParamDataSource* source, const LightList* pLightList);
 
     /** 
     @see SubRenderState::copyFrom.
@@ -122,7 +121,7 @@ protected:
 
     };
 
-    typedef vector<ShadowTextureParams>::type           ShadowTextureParamsList;
+    typedef std::vector<ShadowTextureParams>           ShadowTextureParamsList;
     typedef ShadowTextureParamsList::iterator           ShadowTextureParamsIterator;
     typedef ShadowTextureParamsList::const_iterator     ShadowTextureParamsConstIterator;
 
@@ -185,6 +184,7 @@ protected:
     // Derived scene colour (ambient term).
     UniformParameterPtr mPSDerivedSceneColour;
 
+    bool mUseTextureCompare;
 };
 
 

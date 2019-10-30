@@ -44,17 +44,20 @@ namespace Ogre
      a specific texture, material, buffer, etc. But this may be the same as the
      current status of the state machine and is therefore redundant and causes
      unnecessary work to be performed by OpenGL.
-     @par
+
      Instead we are caching the state so that we can check whether it actually
      does need to be updated. This leads to improved performance all around and 
      can be somewhat dramatic in some cases.
+
+     @warning caching does not work with multiple windows, sharing the same context.
+     They will erroneously get different state caches.
      */
     class _OgreGLExport GLStateCacheManagerCommon : public StateCacheAlloc
     {
     protected:
-        typedef OGRE_HashMap<uint32, uint32> BindBufferMap;
-        typedef OGRE_HashMap<uint32, int> TexParameteriMap;
-        typedef OGRE_HashMap<uint32, float> TexParameterfMap;
+        typedef std::unordered_map<uint32, uint32> BindBufferMap;
+        typedef std::unordered_map<uint32, int> TexParameteriMap;
+        typedef std::unordered_map<uint32, float> TexParameterfMap;
 
         /* These variables are used for caching OpenGL state.
          They are cached because state changes can be quite expensive,
@@ -62,7 +65,7 @@ namespace Ogre
          */
 
         /// Array of each OpenGL feature that is enabled i.e. blending, depth test, etc.
-        vector<uint32>::type mEnableVector;
+        std::vector<uint32> mEnableVector;
         /// Stores the current clear colour
         float mClearColour[4];
         /// Stores the current depth clearing colour
@@ -84,6 +87,10 @@ namespace Ogre
         /// Stores the current blend equation
         uint32 mBlendEquationRGB;
         uint32 mBlendEquationAlpha;
+        uint32 mBlendFuncSource;
+        uint32 mBlendFuncDest;
+        uint32 mBlendFuncSourceAlpha;
+        uint32 mBlendFuncDestAlpha;
         /// Stores the currently active texture unit
         size_t mActiveTextureUnit;
     public:

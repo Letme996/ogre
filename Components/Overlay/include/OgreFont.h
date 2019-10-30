@@ -152,10 +152,10 @@ namespace Ogre
         };
         /// A range of code points, inclusive on both ends
         typedef std::pair<CodePoint, CodePoint> CodePointRange;
-        typedef vector<CodePointRange>::type CodePointRangeList;
+        typedef std::vector<CodePointRange> CodePointRangeList;
     protected:
         /// Map from unicode code point to texture coordinates
-        typedef map<CodePoint, GlyphInfo>::type CodePointMap;
+        typedef std::map<CodePoint, GlyphInfo> CodePointMap;
         CodePointMap mCodePointMap;
 
         /// The material which is generated for this font
@@ -305,10 +305,7 @@ namespace Ogre
             }
             else
             {
-                mCodePointMap.insert(
-                    CodePointMap::value_type(id, 
-                        GlyphInfo(id, UVRect(u1, v1, u2, v2), 
-                            textureAspect * (u2 - u1)  / (v2 - v1))));
+                mCodePointMap.emplace(id, GlyphInfo(id, UVRect(u1, v1, u2, v2), textureAspect * (u2 - u1) / (v2 - v1)));
             }
 
         }
@@ -414,6 +411,13 @@ namespace Ogre
             when the Texture that this font creates needs to (re)load.
         */
         void loadResource(Resource* resource);
+
+        /** Manually set the material used for this font.
+        @remarks
+            This should only be used when the font is being loaded from a
+            ManualResourceLoader.
+        */
+        void _setMaterial(const MaterialPtr& mat);
     };
 
     typedef SharedPtr<Font> FontPtr;

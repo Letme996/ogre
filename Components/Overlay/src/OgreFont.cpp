@@ -159,6 +159,11 @@ namespace Ogre
         return i->second;
     }
     //---------------------------------------------------------------------
+    void Font::_setMaterial(const MaterialPtr &mat)
+    {
+        mMaterial = mat;
+    }
+    //---------------------------------------------------------------------
     void Font::loadImpl()
     {
         // Create a new material
@@ -474,9 +479,7 @@ namespace Ogre
     String Font::CmdCharSpacer::doGet(const void* target) const
     {
         const Font* f = static_cast<const Font*>(target);
-        char buf[sizeof(uint)];
-        sprintf(buf, "%d", f->getCharacterSpacer());
-        return String(buf);
+        return StringUtil::format("%d", f->getCharacterSpacer());
     }
     void Font::CmdCharSpacer::doSet(void* target, const String& val)
     {

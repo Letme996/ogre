@@ -91,8 +91,7 @@ namespace Ogre {
             VertexDeclaration* decl = mRenderOp.vertexData->vertexDeclaration;
             size_t offset = 0;
             // Positions
-            decl->addElement(POS_TEX_BINDING, offset, VET_FLOAT3, VES_POSITION);
-            offset += VertexElement::getTypeSize(VET_FLOAT3);
+            offset += decl->addElement(POS_TEX_BINDING, offset, VET_FLOAT3, VES_POSITION).getSize();
             // Texcoords
             decl->addElement(POS_TEX_BINDING, offset, VET_FLOAT2, VES_TEXTURE_COORDINATES, 0);
             // Colours - store these in a separate buffer because they change less often
@@ -142,7 +141,8 @@ namespace Ogre {
                 createVertexBuffer(
                     decl->getVertexSize(POS_TEX_BINDING), 
                     allocatedVertexCount,
-                    HardwareBuffer::HBU_DYNAMIC_WRITE_ONLY);
+                    HardwareBuffer::HBU_DYNAMIC_WRITE_ONLY,
+                    true);//Workaround, using shadow buffer to avoid stall due to buffer mapping
         bind->setBinding(POS_TEX_BINDING, vbuf);
 
         // colours
@@ -150,7 +150,8 @@ namespace Ogre {
                 createVertexBuffer(
                     decl->getVertexSize(COLOUR_BINDING), 
                     allocatedVertexCount,
-                    HardwareBuffer::HBU_DYNAMIC_WRITE_ONLY);
+                    HardwareBuffer::HBU_DYNAMIC_WRITE_ONLY,
+                    true);//Workaround, using shadow buffer to avoid stall due to buffer mapping
         bind->setBinding(COLOUR_BINDING, vbuf);
 
         // Buffers are restored, but with trash within
@@ -165,8 +166,7 @@ namespace Ogre {
             return;
 
         VertexBufferBinding* bind = mRenderOp.vertexData->vertexBufferBinding;
-        bind->unsetBinding(POS_TEX_BINDING);
-        bind->unsetBinding(COLOUR_BINDING);
+        bind->unsetAllBindings();
     }
     //---------------------------------------------------------------------
 
@@ -187,8 +187,8 @@ namespace Ogre {
         // Get position / texcoord buffer
         const HardwareVertexBufferSharedPtr& vbuf = 
             mRenderOp.vertexData->vertexBufferBinding->getBuffer(POS_TEX_BINDING);
-        pVert = static_cast<float*>(
-            vbuf->lock(HardwareBuffer::HBL_DISCARD) );
+        HardwareBufferLockGuard vbufLock(vbuf, HardwareBuffer::HBL_DISCARD);
+        pVert = static_cast<float*>(vbufLock.pData);
 
         float largestWidth = 0;
         float left = _getDerivedLeft() * 2.0f - 1.0f;
@@ -211,7 +211,7 @@ namespace Ogre {
                 Real len = 0.0f;
                 for( DisplayString::iterator j = i; j != iend; j++ )
                 {
-                    Font::CodePoint character = OGRE_DEREF_DISPLAYSTRING_ITERATOR(j);
+                    Font::CodePoint character = j.getCharacter();
                     if (character == UNICODE_CR
                         || character == UNICODE_NEL
                         || character == UNICODE_LF) 
@@ -236,7 +236,7 @@ namespace Ogre {
                 newLine = false;
             }
 
-            Font::CodePoint character = OGRE_DEREF_DISPLAYSTRING_ITERATOR(i);
+            Font::CodePoint character = i.getCharacter();
             if (character == UNICODE_CR
                 || character == UNICODE_NEL
                 || character == UNICODE_LF)
@@ -252,7 +252,7 @@ namespace Ogre {
                 {
                     DisplayString::iterator peeki = i;
                     peeki++;
-                    if (peeki != iend && OGRE_DEREF_DISPLAYSTRING_ITERATOR(peeki) == UNICODE_LF)
+                    if (peeki != iend && peeki.getCharacter() == UNICODE_LF)
                     {
                         i = peeki; // skip both as one newline
                         // Also reduce tri count
@@ -345,8 +345,6 @@ namespace Ogre {
 
             }
         }
-        // Unlock vertex buffer
-        vbuf->unlock();
 
         if (mMetricsMode == GMM_PIXELS)
         {
@@ -373,14 +371,14 @@ namespace Ogre {
         mGeomUVsOutOfDate = true;
     }
 
-    void TextAreaOverlayElement::setFontName( const String& font )
+    void TextAreaOverlayElement::setFontName( const String& font, const String& group )
     {
-        mFont = FontManager::getSingleton().getByName(
-            font, ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME);
+        mFont = FontManager::getSingleton().getByName(font, group);
         if (!mFont)
             OGRE_EXCEPT( Exception::ERR_ITEM_NOT_FOUND, "Could not find font " + font,
                 "TextAreaOverlayElement::setFontName" );
-        
+        mMaterial.reset();
+
         mGeomPositionsOutOfDate = true;
         mGeomUVsOutOfDate = true;
     }
@@ -555,8 +553,8 @@ namespace Ogre {
         HardwareVertexBufferSharedPtr vbuf = 
             mRenderOp.vertexData->vertexBufferBinding->getBuffer(COLOUR_BINDING);
 
-        RGBA* pDest = static_cast<RGBA*>(
-            vbuf->lock(HardwareBuffer::HBL_DISCARD) );
+        HardwareBufferLockGuard vbufLock(vbuf, HardwareBuffer::HBL_DISCARD);
+        RGBA* pDest = static_cast<RGBA*>(vbufLock.pData);
 
         for (size_t i = 0; i < mAllocSize; ++i)
         {
@@ -569,8 +567,6 @@ namespace Ogre {
             *pDest++ = bottomColour;
             *pDest++ = bottomColour;
         }
-        vbuf->unlock();
-
     }
     //-----------------------------------------------------------------------
     void TextAreaOverlayElement::setMetricsMode(GuiMetricsMode gmm)

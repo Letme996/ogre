@@ -44,13 +44,13 @@ namespace Ogre {
 		//-----------------------------------------------------------------------
 		bool FFPAlphaTest::resolveParameters(ProgramSet* programSet)
 		{
-			Program* psProgram  = programSet->getCpuFragmentProgram();
+			Program* psProgram  = programSet->getCpuProgram(GPT_FRAGMENT_PROGRAM);
 			Function* psMain = psProgram->getEntryPointFunction();
 			  
-			mPSAlphaRef = psProgram->resolveAutoParameterReal(GpuProgramParameters::ACT_SURFACE_ALPHA_REJECTION_VALUE, 0);
+			mPSAlphaRef = psProgram->resolveParameter(GpuProgramParameters::ACT_SURFACE_ALPHA_REJECTION_VALUE);
 			mPSAlphaFunc = psProgram->resolveParameter(GCT_FLOAT1,-1, (uint16)GPV_GLOBAL, "gAlphaFunc");
 			
-			mPSOutDiffuse = psMain->resolveOutputParameter(Parameter::SPS_COLOR, 0, Parameter::SPC_COLOR_DIFFUSE, GCT_FLOAT4);
+			mPSOutDiffuse = psMain->resolveOutputParameter(Parameter::SPC_COLOR_DIFFUSE);
 			
 			return true;
 		}
@@ -60,7 +60,7 @@ namespace Ogre {
 		//-----------------------------------------------------------------------
 		bool FFPAlphaTest::resolveDependencies(ProgramSet* programSet)
 		{
-			Program* psProgram = programSet->getCpuFragmentProgram();
+			Program* psProgram = programSet->getCpuProgram(GPT_FRAGMENT_PROGRAM);
 			psProgram->addDependency(FFP_LIB_ALPHA_TEST);
 			return true;
 		}
@@ -74,20 +74,13 @@ namespace Ogre {
 
 		bool FFPAlphaTest::addFunctionInvocations( ProgramSet* programSet )
 		{
-			Program* psProgram = programSet->getCpuFragmentProgram();
+			Program* psProgram = programSet->getCpuProgram(GPT_FRAGMENT_PROGRAM);
 			Function* psMain = psProgram->getEntryPointFunction();
 
-			FunctionInvocation *curFuncInvocation;
+            psMain->getStage(FFP_PS_ALPHA_TEST)
+                .callFunction(FFP_FUNC_ALPHA_TEST, {In(mPSAlphaFunc), In(mPSAlphaRef), In(mPSOutDiffuse)});
 
-			//Fragment shader invocations
-			curFuncInvocation = OGRE_NEW FunctionInvocation(FFP_FUNC_ALPHA_TEST, FFP_PS_ALPHA_TEST);
-			curFuncInvocation->pushOperand(mPSAlphaFunc, Operand::OPS_IN);
-			curFuncInvocation->pushOperand(mPSAlphaRef, Operand::OPS_IN);
-			curFuncInvocation->pushOperand(mPSOutDiffuse, Operand::OPS_IN);
-
-			psMain->addAtomInstance(curFuncInvocation);	
-
-			return true;
+            return true;
 		}
 
 		int FFPAlphaTest::getExecutionOrder() const
@@ -100,7 +93,7 @@ namespace Ogre {
 			return srcPass->getAlphaRejectFunction() != CMPF_ALWAYS_PASS;
 		}
 
-		void FFPAlphaTest::updateGpuProgramsParams( Renderable* rend, Pass* pass, const AutoParamDataSource* source, const LightList* pLightList )
+		void FFPAlphaTest::updateGpuProgramsParams( Renderable* rend, const Pass* pass, const AutoParamDataSource* source, const LightList* pLightList )
 		{
 			mPSAlphaFunc->setGpuParameter((float)pass->getAlphaRejectFunction());
 		}

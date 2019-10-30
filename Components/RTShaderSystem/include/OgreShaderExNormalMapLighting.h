@@ -43,7 +43,7 @@ namespace RTShader {
 *  @{
 */
 
-#define SGX_LIB_NORMALMAPLIGHTING                   "SGXLib_NormalMapLighting"
+#define SGX_LIB_NORMALMAP                           "SGXLib_NormalMap"
 #define SGX_FUNC_CONSTRUCT_TBNMATRIX                "SGX_ConstructTBNMatrix"
 #define SGX_FUNC_FETCHNORMAL                        "SGX_FetchNormal"
 
@@ -66,7 +66,7 @@ public:
     /** 
     @see SubRenderState::updateGpuProgramsParams.
     */
-    virtual void updateGpuProgramsParams(Renderable* rend, Pass* pass, const AutoParamDataSource* source, const LightList* pLightList);
+    virtual void updateGpuProgramsParams(Renderable* rend, const Pass* pass, const AutoParamDataSource* source, const LightList* pLightList);
 
     /** 
     @see SubRenderState::copyFrom.
@@ -131,42 +131,21 @@ public:
     */
     const String& getNormalMapTextureName() const { return mNormalMapTextureName; }
 
-    /** 
-    Set the normal map filtering attributes.
-    @param minFilter The desired min filter.
-    @param magFilter The desired mag filter.
-    @param mipFilter The desired mip filter.
-    */
+    /// @deprecated use setNormalMapSampler
     void setNormalMapFiltering(const FilterOptions minFilter, const FilterOptions magFilter, const FilterOptions mipFilter) 
-    { mNormalMapMinFilter = minFilter; mNormalMapMagFilter = magFilter; mNormalMapMipFilter = mipFilter; }
+    { mNormalMapSampler->setFiltering(minFilter, magFilter, mipFilter); }
 
-    /** 
-    Return the normal map filtering attributes.
-    @param minFilter The desired min filter.
-    @param magFilter The desired mag filter.
-    @param mipFilter The desired mip filter.
-    */
-    void getNormalMapFiltering(FilterOptions& minFilter, FilterOptions& magFilter, FilterOptions& mipFilter) const
-    { minFilter = mNormalMapMinFilter; magFilter = mNormalMapMagFilter ; mipFilter = mNormalMapMipFilter; }
+    /// @deprecated use setNormalMapSampler
+    void setNormalMapAnisotropy(unsigned int anisotropy) { mNormalMapSampler->setAnisotropy(anisotropy); }
 
-    /** Setup the normal map anisotropy value. 
-    @param anisotropy The anisotropy value.
-    */
-    void setNormalMapAnisotropy(unsigned int anisotropy) { mNormalMapAnisotropy = anisotropy; }
+    /// @deprecated use setNormalMapSampler
+    void setNormalMapMipBias(Real mipBias) { mNormalMapSampler->setMipmapBias(mipBias); }
 
+    /// return the normal map sampler
+    const SamplerPtr& getNormalMapSampler() const { return mNormalMapSampler; }
 
-    /** Return the normal map anisotropy value. */
-    unsigned int getNormalMapAnisotropy() const { return mNormalMapAnisotropy; }
-
-    
-    /** Setup the normal map map mip bias value. 
-    @param mipBias The map mip bias value.
-    */
-    void setNormalMapMipBias(Real mipBias) { mNormalMapMipBias = mipBias; }
-
-
-    /** Return the normal map mip bias value. */
-    Real getNormalMapMipBias() const { return mNormalMapMipBias; }
+    /// set the normal map sampler
+    void setNormalMapSampler(const SamplerPtr& sampler) { mNormalMapSampler = sampler; }
 
 // Protected methods
 protected:
@@ -189,22 +168,12 @@ protected:
     /** 
     Internal method that adds related vertex shader functions invocations.
     */
-    bool addVSInvocation(Function* vsMain, const int groupOrder);
+    void addVSInvocation(const FunctionStageRef& stage);
 
     /** 
     Internal method that adds per light illumination component functions invocations.
     */
-    bool addVSIlluminationInvocation(LightParams* curLightParams, Function* vsMain, const int groupOrder);
-
-    /** 
-    Internal method that perform normal fetch invocation.
-    */
-    bool addPSNormalFetchInvocation(Function* psMain, const int groupOrder);
-
-    /** 
-    Internal method that adds per light illumination component functions invocations.
-    */
-    bool addPSIlluminationInvocation(LightParams* curLightParams, Function* psMain, const int groupOrder);
+    void addVSIlluminationInvocation(const LightParams* curLightParams, const FunctionStageRef& stage);
 
 // Attributes.
 protected:  
@@ -214,16 +183,8 @@ protected:
     unsigned short mNormalMapSamplerIndex;
     // Vertex shader input texture coordinate set index.
     unsigned int mVSTexCoordSetIndex;
-    // The normal map min filter.
-    FilterOptions mNormalMapMinFilter;
-    // The normal map mag filter.
-    FilterOptions mNormalMapMagFilter;
-    // The normal map mip filter.
-    FilterOptions mNormalMapMipFilter;
-    // The normal map max anisotropy value.
-    unsigned int mNormalMapAnisotropy;
-    // The normal map mip map bias.
-    Real mNormalMapMipBias;
+    // The normal map sampler
+    SamplerPtr mNormalMapSampler;
     // The normal map space.
     NormalMapSpace mNormalMapSpace;
     // World matrix parameter.
@@ -234,10 +195,6 @@ protected:
     UniformParameterPtr mCamPosWorldSpace;
     // Vertex shader world position parameter.
     ParameterPtr mVSWorldPosition;
-    // Vertex shader output view vector (position in camera space) parameter.
-    ParameterPtr mVSOutView;
-    // Pixel shader input view position (position in camera space) parameter.
-    ParameterPtr mPSInView;
     // Vertex shader input tangent.
     ParameterPtr mVSInTangent;
     // Vertex shader local TNB matrix.
@@ -245,11 +202,7 @@ protected:
     // Vertex shader local light direction.
     ParameterPtr mVSLocalDir;
     // Normal map texture sampler parameter.
-    UniformParameterPtr mNormalMapSampler;
-	// Normal map texture sampler state parameter.
-	UniformParameterPtr mNormalMapSamplerState;
-    // Pixel shader normal parameter.
-    ParameterPtr mPSNormal;
+    UniformParameterPtr mPSNormalMapSampler;
     // Vertex shader input texture coordinates.
     ParameterPtr mVSInTexcoord;
     // Vertex shader output texture coordinates.

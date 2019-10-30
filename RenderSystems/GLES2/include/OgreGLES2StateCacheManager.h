@@ -43,18 +43,14 @@ namespace Ogre
             TexParameterfMap mTexParameterfMap;
         };
 
-        typedef OGRE_HashMap<GLuint, TextureUnitParams> TexUnitsMap;
+        typedef std::unordered_map<GLuint, TextureUnitParams> TexUnitsMap;
 
         /// Stores the currently bound vertex array object
         GLuint mActiveVertexArray;
         /// A map of texture parameters for each texture unit
         TexUnitsMap mTexUnitsMap;
         /// Stores the currently enabled vertex attributes
-        vector<GLuint>::type mEnabledVertexAttribs;
-        /// Stores the current blend source function
-        GLenum mBlendFuncSource;
-        /// Stores the current blend destination function
-        GLenum mBlendFuncDest;
+        std::vector<GLuint> mEnabledVertexAttribs;
         /// Stores the last bound texture id
         GLuint mLastBoundTexID;
     public:
@@ -116,21 +112,13 @@ namespace Ogre
          @param unit The texture unit to activate.
          @return Whether or not the texture unit was successfully activated.
          */
-        bool activateGLTextureUnit(unsigned char unit);
-
-        /** Sets the current blend equation setting.
-         @param eq The blend equation to use.
-         */
-        void setBlendEquation(GLenum eq);
+        bool activateGLTextureUnit(size_t unit);
 
         /// Set the blend equation for RGB and alpha separately.
         void setBlendEquation(GLenum eqRGB, GLenum eqA);
 
-        /** Sets the blending function.
-         @param source The blend mode for the source.
-         @param dest The blend mode for the destination
-         */
-        void setBlendFunc(GLenum source, GLenum dest);
+        /// Set the blend function for RGB and alpha separately.
+        void setBlendFunc(GLenum source, GLenum dest, GLenum sourceA, GLenum destA);
 
         /** Sets the current depth mask setting.
          @param mask The depth mask to use.

@@ -54,14 +54,14 @@ public:
     virtual const String& getTargetLanguage(void) const = 0;
     
     /// Create writer instance
-    virtual ProgramWriter* create(void) = 0;
+    virtual ProgramWriter* create(void) OGRE_NODISCARD = 0;
 };
 
 class _OgreRTSSExport ProgramWriterManager 
     : public Singleton<ProgramWriterManager>, public RTShaderSystemAlloc
 {
 public:
-    typedef map<String, ProgramWriterFactory*>::type FactoryMap;
+    typedef std::map<String, ProgramWriterFactory*> FactoryMap;
 protected:
     /// Factories capable of creating ShaderProgramWriterFactory instances
     FactoryMap mFactories;

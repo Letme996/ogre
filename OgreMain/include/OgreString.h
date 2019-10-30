@@ -37,6 +37,8 @@ THE SOFTWARE.
 #   define strtod_l _strtod_l
 #   define strtoul_l _strtoul_l
 #   define strtol_l _strtol_l
+#   define strtoull_l _strtoull_l
+#   define strtoll_l _strtoll_l
 #   define stricmp _stricmp
 #   define strnicmp _strnicmp
 #else
@@ -49,6 +51,8 @@ THE SOFTWARE.
 #   define strtod_l(ptr, end, l) strtod(ptr, end)
 #   define strtoul_l(ptr, end, base, l) strtoul(ptr, end, base)
 #   define strtol_l(ptr, end, base, l) strtol(ptr, end, base)
+#   define strtoull_l(ptr, end, base, l) strtoull(ptr, end, base)
+#   define strtoll_l(ptr, end, base, l) strtoll(ptr, end, base)
 #endif
 
 // If compiling with make on macOS, these headers need to be included to get
@@ -57,6 +61,12 @@ THE SOFTWARE.
 #if OGRE_PLATFORM == OGRE_PLATFORM_APPLE
 #   include <stdlib.h>
 #   include <xlocale.h>
+#endif
+
+#if OGRE_COMPILER == OGRE_COMPILER_GNUC || OGRE_COMPILER == OGRE_COMPILER_CLANG
+#define OGRE_FORMAT_PRINTF(string_idx, first_to_check) __attribute__ ((format (printf, string_idx, first_to_check)))
+#else
+#define OGRE_FORMAT_PRINTF(A, B)
 #endif
 
 namespace Ogre {
@@ -71,8 +81,8 @@ namespace Ogre {
     class _OgreExport StringUtil
     {
     public:
-        OGRE_DEPRECATED static const String& BLANK; /// @deprecated use Ogre::BLANKSTRING instead
-        OGRE_DEPRECATED typedef StringStream StrStreamType; /// @deprecated use Ogre::StringStream instead
+        OGRE_DEPRECATED static const String& BLANK; //!< @deprecated use Ogre::BLANKSTRING instead
+        OGRE_DEPRECATED typedef StringStream StrStreamType; //!< @deprecated use Ogre::StringStream instead
 
         /** Removes any whitespace characters, be it standard space or
             TABs and so on.
@@ -94,7 +104,7 @@ namespace Ogre {
             @param
             preserveDelims Flag to determine if delimiters should be saved as substrings
         */
-        static vector<String>::type split( const String& str, const String& delims = "\t\n ", unsigned int maxSplits = 0, bool preserveDelims = false);
+        static std::vector<String> split( const String& str, const String& delims = "\t\n ", unsigned int maxSplits = 0, bool preserveDelims = false);
 
         /** Returns a StringVector that contains all the substrings delimited
             by the characters in the passed <code>delims</code> argument,
@@ -109,7 +119,7 @@ namespace Ogre {
             maxSplits The maximum number of splits to perform (0 for unlimited splits). If this
             parameters is > 0, the splitting process will stop after this many splits, left to right.
         */
-        static vector<String>::type tokenise( const String& str, const String& delims = "\t\n ", const String& doubleDelims = "\"", unsigned int maxSplits = 0);
+        static std::vector<String> tokenise( const String& str, const String& delims = "\t\n ", const String& doubleDelims = "\"", unsigned int maxSplits = 0);
 
         /** Lower-cases all the characters in the string.
          */
@@ -196,6 +206,12 @@ namespace Ogre {
             @return An updated string with the sub-string replaced
         */
         static const String replaceAll(const String& source, const String& replaceWhat, const String& replaceWithWhat);
+
+        /** create a string from a printf expression
+         *
+         * @note this function - like printf - uses a locale dependent decimal point
+         */
+        static String format(const char* fmt, ...) OGRE_FORMAT_PRINTF(1, 2);
     };
 
     typedef ::std::hash< _StringBase > _StringHash;

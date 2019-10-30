@@ -91,7 +91,7 @@ namespace Ogre {
     {
         op.operationType = mOperationType;
         op.useIndexes = false;
-        op.vertexData = mVertexData;
+        op.vertexData = mVertexData.get();
     }
 //-----------------------------------------------------------------------------
     void GLES2RenderToVertexBuffer::update(SceneManager* sceneMgr)
@@ -152,9 +152,6 @@ namespace Ogre {
 
         RenderSystem* targetRenderSystem = Root::getSingleton().getRenderSystem();
         // Draw the object
-        targetRenderSystem->_setWorldMatrix(Matrix4::IDENTITY);
-        targetRenderSystem->_setViewMatrix(Matrix4::IDENTITY);
-        targetRenderSystem->_setProjectionMatrix(Matrix4::IDENTITY);
         if (r2vbPass->hasVertexProgram())
         {
             targetRenderSystem->bindGpuProgramParameters(GPT_VERTEX_PROGRAM, 

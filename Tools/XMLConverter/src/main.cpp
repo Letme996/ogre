@@ -288,7 +288,7 @@ XmlOptions parseArgs(int numArgs, char **args)
     }
     // Work out what kind of conversion this is
     opts.source = source;
-    Ogre::vector<String>::type srcparts = StringUtil::split(opts.source, ".");
+    std::vector<String> srcparts = StringUtil::split(opts.source, ".");
     String& ext = srcparts.back();
     StringUtil::toLowerCase(ext);
     opts.sourceExt = ext;
@@ -312,7 +312,7 @@ XmlOptions parseArgs(int numArgs, char **args)
     {
         opts.dest = dest;
     }
-    Ogre::vector<String>::type dstparts = StringUtil::split(opts.dest, ".");
+    std::vector<String> dstparts = StringUtil::split(opts.dest, ".");
     ext = dstparts.back();
     StringUtil::toLowerCase(ext);
     opts.destExt = ext;
@@ -387,18 +387,17 @@ void XMLToBinary(XmlOptions opts)
 {
     // Read root element and decide from there what type
     String response;
-    TiXmlDocument* doc = new TiXmlDocument(opts.source);
+    pugi::xml_document doc;
+
     // Some double-parsing here but never mind
-    if (!doc->LoadFile())
+    if (!doc.load_file(opts.source.c_str()))
     {
         cout << "Unable to open file " << opts.source << " - fatal error." << endl;
-        delete doc;
         exit (1);
     }
-    TiXmlElement* root = doc->RootElement();
-    if (!stricmp(root->Value(), "mesh"))
+    pugi::xml_node root = doc.document_element();
+    if (!stricmp(root.name(), "mesh"))
     {
-        delete doc;
         MeshPtr newMesh = MeshManager::getSingleton().createManual("conversion", 
             ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
         VertexElementType colourElementType;
@@ -476,9 +475,8 @@ void XMLToBinary(XmlOptions opts)
         MeshManager::getSingleton().remove("conversion",
                                            ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
     }
-    else if (!stricmp(root->Value(), "skeleton"))
+    else if (!stricmp(root.name(), "skeleton"))
     {
-        delete doc;
         SkeletonPtr newSkel = SkeletonManager::getSingleton().create("conversion", 
             ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
         xmlSkeletonSerializer->importSkeleton(opts.source, newSkel.get());
@@ -492,11 +490,6 @@ void XMLToBinary(XmlOptions opts)
         SkeletonManager::getSingleton().remove("conversion",
                                                ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
     }
-    else
-    {
-        delete doc;
-    }
-
 }
 
 void skeletonToXML(XmlOptions opts)
@@ -523,6 +516,18 @@ void skeletonToXML(XmlOptions opts)
     SkeletonManager::getSingleton().remove("conversion",
                                            ResourceGroupManager::DEFAULT_RESOURCE_GROUP_NAME);
 }
+
+struct MaterialCreator : public MeshSerializerListener
+{
+    void processMaterialName(Mesh *mesh, String *name)
+    {
+        // create material because we do not load any .material files
+        MaterialManager::getSingleton().create(*name, mesh->getGroup());
+    }
+
+    void processSkeletonName(Mesh *mesh, String *name) {}
+    void processMeshCompleted(Mesh *mesh) {}
+};
 }
 
 int main(int numargs, char** args)
@@ -557,6 +562,8 @@ int main(int numargs, char** args)
         matMgr->initialise();
         skelMgr = new SkeletonManager();
         meshSerializer = new MeshSerializer();
+        MaterialCreator matCreator;
+        meshSerializer->setListener(&matCreator);
         xmlMeshSerializer = new XMLMeshSerializer();
         skeletonSerializer = new SkeletonSerializer();
         xmlSkeletonSerializer = new XMLSkeletonSerializer();

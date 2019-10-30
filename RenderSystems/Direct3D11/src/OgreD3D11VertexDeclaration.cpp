@@ -70,7 +70,7 @@ namespace Ogre {
 
         if (mD3delems.find(boundVertexProgram) == mD3delems.end())
         {
-            vector<D3D11_INPUT_ELEMENT_DESC>::type D3delems;
+            std::vector<D3D11_INPUT_ELEMENT_DESC> D3delems;
 
             unsigned int idx;
             for (idx = 0; idx < iNumElements; ++idx)
@@ -93,10 +93,11 @@ namespace Ogre {
                     }
                 }
 
-                if(!found)
+                if (!found)
                 {
-                    OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR, "Unable to set D3D11 vertex declaration" , 
-                                                "D3D11VertexDeclaration::getILayoutByShader");
+                    OGRE_EXCEPT(Exception::ERR_RENDERINGAPI_ERROR,
+                                StringUtil::format("No VertexElement for semantic %s in shader %s found",
+                                                   inputDesc.SemanticName, boundVertexProgram->getName().c_str()));
                 }
 
                 D3D11_INPUT_ELEMENT_DESC elem = {};
@@ -113,7 +114,7 @@ namespace Ogre {
                 if ( foundIter != binding->getBindings().end() )
                 {
                     HardwareVertexBufferSharedPtr bufAtSlot = foundIter->second;
-                    if ( bufAtSlot->getIsInstanceData() )
+                    if ( bufAtSlot->isInstanceData() )
                     {
                         elem.InputSlotClass        = D3D11_INPUT_PER_INSTANCE_DATA;
                         elem.InstanceDataStepRate  = bufAtSlot->getInstanceDataStepRate();

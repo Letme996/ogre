@@ -26,7 +26,6 @@ THE SOFTWARE.
 -----------------------------------------------------------------------------
 */
 
-#include "OgreSTBICodecExports.h"
 #include "OgreSTBICodec.h"
 #include "OgreLogManager.h"
 #include "OgreDataStream.h"
@@ -52,7 +51,7 @@ static Ogre::uchar* custom_zlib_compress(Ogre::uchar* data, int data_len, int* o
     if (ret != Z_OK)
     {
         free(dest);
-        OGRE_EXCEPT(Ogre::Exception::ERR_INTERNAL_ERROR, "compress failed", __FUNCTION__);
+        OGRE_EXCEPT(Ogre::Exception::ERR_INTERNAL_ERROR, "compress failed");
     }
 
     *out_len = destLen;
@@ -74,7 +73,7 @@ namespace Ogre {
         stbi_convert_iphone_png_to_rgb(1);
         stbi_set_unpremultiply_on_load(1);
 
-        LogManager::getSingleton().logMessage("stb_image - v2.19 - public domain JPEG/PNG reader");
+        LogManager::getSingleton().logMessage("stb_image - v2.23 - public domain image loader");
         
         // Register codecs
         String exts = "jpeg,jpg,png,bmp,psd,tga,gif,pic,ppm,pgm,hdr";
@@ -85,11 +84,8 @@ namespace Ogre {
             msCodecList.push_back(codec);
             Codec::registerCodec(codec);
         }
-        
-        StringStream strExt;
-        strExt << "Supported formats: " << exts;
 
-        LogManager::getSingleton().logMessage(strExt.str());
+        LogManager::getSingleton().logMessage("Supported formats: " + exts);
     }
     //---------------------------------------------------------------------
     void STBIImageCodec::shutdown(void)
@@ -178,7 +174,7 @@ namespace Ogre {
         String contents = input->getAsString();
 
         int width, height, components;
-        stbi_uc* pixelData = stbi_load_from_memory((uchar*)contents.data(),
+        stbi_uc* pixelData = stbi_load_from_memory((const uchar*)contents.data(),
                 static_cast<int>(contents.size()), &width, &height, &components, 0);
 
         if (!pixelData)

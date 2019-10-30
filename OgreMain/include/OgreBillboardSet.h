@@ -147,9 +147,9 @@ namespace Ogre {
         bool mAllDefaultRotation;
         bool mWorldSpace;
 
-        typedef list<Billboard*>::type ActiveBillboardList;
-        typedef list<Billboard*>::type FreeBillboardList;
-        typedef vector<Billboard*>::type BillboardPool;
+        typedef std::list<Billboard*> ActiveBillboardList;
+        typedef std::list<Billboard*> FreeBillboardList;
+        typedef std::vector<Billboard*> BillboardPool;
 
         /** Active billboard list.
         @remarks
@@ -177,7 +177,7 @@ namespace Ogre {
         BillboardPool mBillboardPool;
 
         /// The vertex position data for all billboards in this set.
-        VertexData* mVertexData;
+        std::unique_ptr<VertexData> mVertexData;
         /// Shortcut to main buffer (positions, colours, texture coords)
         HardwareVertexBufferSharedPtr mMainBuf;
         /// Locked pointer to buffer
@@ -200,12 +200,12 @@ namespace Ogre {
         Vector3 mCamPos;
 
         /// The vertex index data for all billboards in this set (1 set only)
-        IndexData* mIndexData;
+        std::unique_ptr<IndexData> mIndexData;
 
         /// Flag indicating whether each billboard should be culled separately (default: false)
         bool mCullIndividual;
 
-        typedef vector< Ogre::FloatRect >::type TextureCoordSets;
+        typedef std::vector< Ogre::FloatRect > TextureCoordSets;
         TextureCoordSets mTextureCoords;
 
         /// The type of billboard to render
@@ -524,8 +524,6 @@ namespace Ogre {
         virtual Real getDefaultHeight(void) const;
 
         /** Sets the name of the material to be used for this billboard set.
-        @param name
-            The new name of the material to use for this set.
         */
         virtual void setMaterialName( const String& name, const String& groupName = ResourceGroupManager::AUTODETECT_RESOURCE_GROUP_NAME );
 
@@ -534,11 +532,7 @@ namespace Ogre {
         */
         virtual const String& getMaterialName(void) const;
 
-        /** Overridden from MovableObject
-        @see
-            MovableObject
-        */
-        virtual void _notifyCurrentCamera(Camera* cam);
+        virtual void _notifyCurrentCamera(Camera* cam) override;
 
         /** Begin injection of billboard data; applicable when 
             constructing the BillboardSet for external data use.
@@ -558,28 +552,10 @@ namespace Ogre {
         void setBounds(const AxisAlignedBox& box, Real radius);
 
 
-        /** Overridden from MovableObject
-        @see
-            MovableObject
-        */
-        virtual const AxisAlignedBox& getBoundingBox(void) const;
-
-        /** Overridden from MovableObject
-        @see
-            MovableObject
-        */
-        virtual Real getBoundingRadius(void) const;
-        /** Overridden from MovableObject
-        @see
-            MovableObject
-        */
-        virtual void _updateRenderQueue(RenderQueue* queue);
-
-        /** Overridden from MovableObject
-        @see
-            MovableObject
-        */
-        virtual const MaterialPtr& getMaterial(void) const;
+        virtual const AxisAlignedBox& getBoundingBox(void) const override;
+        virtual Real getBoundingRadius(void) const override;
+        virtual void _updateRenderQueue(RenderQueue* queue) override;
+        virtual const MaterialPtr& getMaterial(void) const override;
 
         /** Sets the name of the material to be used for this billboard set.
         @param material
@@ -587,17 +563,9 @@ namespace Ogre {
          */
         virtual void setMaterial( const MaterialPtr& material );
 
-        /** Overridden from MovableObject
-        @see
-            MovableObject
-        */
-        virtual void getRenderOperation(RenderOperation& op);
 
-        /** Overridden from MovableObject
-        @see
-            MovableObject
-        */
-        virtual void getWorldTransforms(Matrix4* xform) const;
+        virtual void getRenderOperation(RenderOperation& op) override;
+        virtual void getWorldTransforms(Matrix4* xform) const override;
 
         /** Internal callback used by Billboards to notify their parent that they have been resized.
         */
@@ -714,11 +682,9 @@ namespace Ogre {
         */
         virtual bool getUseAccurateFacing(void) const { return mAccurateFacing; }
 
-        /** Overridden from MovableObject */
-        virtual const String& getMovableType(void) const;
 
-        /** Overridden, see Renderable */
-        Real getSquaredViewDepth(const Camera* cam) const;
+        virtual const String& getMovableType(void) const override;
+        Real getSquaredViewDepth(const Camera* cam) const override;
 
         /** Update the bounds of the billboardset */
         virtual void _updateBounds(void);

@@ -26,8 +26,23 @@ THE SOFTWARE.
 -----------------------------------------------------------------------------
 */
 #include "OgreStableHeaders.h"
+#include "OgreMeshSerializerImpl.h"
 
 namespace Ogre {
+
+    class _OgrePrivate MeshVersionData : public SerializerAlloc
+    {
+    public:
+        MeshVersion version;
+        String versionString;
+        MeshSerializerImpl* impl;
+
+        MeshVersionData(MeshVersion _ver, const String& _string, MeshSerializerImpl* _impl)
+        : version(_ver), versionString(_string), impl(_impl) {}
+
+        ~MeshVersionData() { OGRE_DELETE impl; }
+
+    };
 
     const unsigned short HEADER_CHUNK_ID = 0x1000;
     //---------------------------------------------------------------------
@@ -85,9 +100,7 @@ namespace Ogre {
     void MeshSerializer::exportMesh(const Mesh* pMesh, const String& filename,
         Endian endianMode)
     {
-        std::fstream *f = OGRE_NEW_T(std::fstream, MEMCATEGORY_GENERAL)();
-        f->open(filename.c_str(), std::ios::binary | std::ios::out);
-        DataStreamPtr stream(OGRE_NEW FileStreamDataStream(f));
+        DataStreamPtr stream = _openFileStream(filename, std::ios::binary | std::ios::out);
 
         exportMesh(pMesh, stream, endianMode);
 
@@ -97,9 +110,7 @@ namespace Ogre {
     void MeshSerializer::exportMesh(const Mesh* pMesh, const String& filename,
                                     MeshVersion version, Endian endianMode)
     {
-        std::fstream *f = OGRE_NEW_T(std::fstream, MEMCATEGORY_GENERAL)();
-        f->open(filename.c_str(), std::ios::binary | std::ios::out);
-        DataStreamPtr stream(OGRE_NEW FileStreamDataStream(f));
+        DataStreamPtr stream = _openFileStream(filename, std::ios::binary | std::ios::out);
         
         exportMesh(pMesh, stream, version, endianMode);
         

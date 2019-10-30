@@ -109,7 +109,7 @@ namespace Ogre
 
                 D3D11_INFO_QUEUE_FILTER filter;
                 ZeroMemory(&filter, sizeof(D3D11_INFO_QUEUE_FILTER));
-                vector<D3D11_MESSAGE_SEVERITY>::type severityList;
+                std::vector<D3D11_MESSAGE_SEVERITY> severityList;
 
                 switch(mExceptionsErrorLevel)
                 {
@@ -176,11 +176,7 @@ namespace Ogre
             res.append("invalid parameters were passed.\n");
             break;
         default:
-            {
-            char tmp[64];
-            sprintf(tmp, "hr = 0x%08X\n", lastResult);
-            res.append(tmp);
-            }
+            res = StringUtil::format("hr = 0x%08X\n", lastResult);
         }
 
         if (mInfoQueue)

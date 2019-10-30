@@ -41,12 +41,12 @@ THE SOFTWARE.
 #   if OGRE_DEBUG_MODE
 #       define OgreAssert( a, b ) assert( (a) && (b) )
 #   else
-#       define OgreAssert( a, b ) if( !(a) ) OGRE_EXCEPT( Ogre::Exception::ERR_RT_ASSERTION_FAILED, (b), __FUNCTION__ )
+#       define OgreAssert( a, b ) if( !(a) ) OGRE_EXCEPT_2( Ogre::Exception::ERR_RT_ASSERTION_FAILED, (b) )
 #   endif
 
 // EXCEPTIONS mode
 #elif OGRE_ASSERT_MODE == 2
-#   define OgreAssert( a, b ) if( !(a) ) OGRE_EXCEPT( Ogre::Exception::ERR_RT_ASSERTION_FAILED, (b), __FUNCTION__ )
+#   define OgreAssert( a, b ) if( !(a) ) OGRE_EXCEPT_2( Ogre::Exception::ERR_RT_ASSERTION_FAILED, (b) )
 // STANDARD mode
 #else
 /** Checks a condition at runtime and throws exception/ aborts if it fails.
@@ -112,7 +112,7 @@ namespace Ogre {
             ERR_INVALIDPARAMS,
             ERR_RENDERINGAPI_ERROR,
             ERR_DUPLICATE_ITEM,
-            ERR_ITEM_NOT_FOUND,
+            ERR_ITEM_NOT_FOUND = ERR_DUPLICATE_ITEM,
             ERR_FILE_NOT_FOUND,
             ERR_INTERNAL_ERROR,
             ERR_RT_ASSERTION_FAILED,
@@ -264,7 +264,6 @@ namespace Ogre {
             case Exception::ERR_INVALIDPARAMS:          throw InvalidParametersException(number, desc, src, file, line);
             case Exception::ERR_RENDERINGAPI_ERROR:     throw RenderingAPIException(number, desc, src, file, line);
             case Exception::ERR_DUPLICATE_ITEM:         throw ItemIdentityException(number, desc, src, file, line);
-            case Exception::ERR_ITEM_NOT_FOUND:         throw ItemIdentityException(number, desc, src, file, line);
             case Exception::ERR_FILE_NOT_FOUND:         throw FileNotFoundException(number, desc, src, file, line);
             case Exception::ERR_INTERNAL_ERROR:         throw InternalErrorException(number, desc, src, file, line);
             case Exception::ERR_RT_ASSERTION_FAILED:    throw RuntimeAssertionException(number, desc, src, file, line);
@@ -286,7 +285,11 @@ namespace Ogre {
 
     
 #ifndef OGRE_EXCEPT
-#define OGRE_EXCEPT(code, desc, src)         Ogre::ExceptionFactory::throwException(code, desc, src, __FILE__, __LINE__)
+#define OGRE_EXCEPT_3(code, desc, src)  Ogre::ExceptionFactory::throwException(code, desc, src, __FILE__, __LINE__)
+#define OGRE_EXCEPT_2(code, desc)       Ogre::ExceptionFactory::throwException(code, desc, __FUNCTION__, __FILE__, __LINE__)
+#define OGRE_EXCEPT_CHOOSER(arg1, arg2, arg3, arg4, ...) arg4
+#define OGRE_EXPAND(x) x // MSVC workaround
+#define OGRE_EXCEPT(...) OGRE_EXPAND(OGRE_EXCEPT_CHOOSER(__VA_ARGS__, OGRE_EXCEPT_3, OGRE_EXCEPT_2)(__VA_ARGS__))
 #endif
     /** @} */
     /** @} */

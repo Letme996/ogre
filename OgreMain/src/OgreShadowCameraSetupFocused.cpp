@@ -46,20 +46,17 @@ namespace Ogre
         0, -1,  0,  0,      // z
         0,  0,  0,  1); // w
 
-    FocusedShadowCameraSetup::FocusedShadowCameraSetup(void)
+    FocusedShadowCameraSetup::FocusedShadowCameraSetup(bool useAggressiveRegion)
         : mTempFrustum(OGRE_NEW Frustum())
         , mLightFrustumCamera(OGRE_NEW Camera("TEMP LIGHT INTERSECT CAM", NULL))
         , mLightFrustumCameraCalculated(false)
-        , mUseAggressiveRegion(true)
+        , mUseAggressiveRegion(useAggressiveRegion)
     {
         mTempFrustum->setProjectionType(PT_PERSPECTIVE);
     }
-    //-----------------------------------------------------------------------
-    FocusedShadowCameraSetup::~FocusedShadowCameraSetup(void)
-    {
-        OGRE_DELETE mTempFrustum;
-        OGRE_DELETE mLightFrustumCamera;
-    }
+
+    FocusedShadowCameraSetup::~FocusedShadowCameraSetup() {}
+
     //-----------------------------------------------------------------------
     void FocusedShadowCameraSetup::calculateShadowMappingMatrix(const SceneManager& sm,
         const Camera& cam, const Light& light, Affine3 *out_view, Matrix4 *out_proj,
@@ -233,7 +230,7 @@ namespace Ogre
             // set up light camera to clip with the resulting frustum planes
             if (!mLightFrustumCameraCalculated)
             {
-                calculateShadowMappingMatrix(sm, cam, light, NULL, NULL, mLightFrustumCamera);
+                calculateShadowMappingMatrix(sm, cam, light, NULL, NULL, mLightFrustumCamera.get());
                 mLightFrustumCameraCalculated = true;
             }
             mBodyB.clip(*mLightFrustumCamera);
@@ -286,7 +283,7 @@ namespace Ogre
             // set up light camera to clip the resulting frustum
             if (!mLightFrustumCameraCalculated)
             {
-                calculateShadowMappingMatrix(sm, cam, light, NULL, NULL, mLightFrustumCamera);
+                calculateShadowMappingMatrix(sm, cam, light, NULL, NULL, mLightFrustumCamera.get());
                 mLightFrustumCameraCalculated = true;
             }
             bodyLVS.clip(*mLightFrustumCamera);

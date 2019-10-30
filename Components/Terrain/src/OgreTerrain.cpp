@@ -1127,8 +1127,7 @@ namespace Ogre
             load();
         else
             OGRE_EXCEPT(Exception::ERR_INTERNAL_ERROR, 
-            "Error while preparing " + filename + ", see log for details", 
-            __FUNCTION__);
+            "Error while preparing " + filename + ", see log for details");
     }
     //---------------------------------------------------------------------
     void Terrain::load(StreamSerialiser& stream)
@@ -1137,8 +1136,7 @@ namespace Ogre
             load();
         else
             OGRE_EXCEPT(Exception::ERR_INTERNAL_ERROR, 
-            "Error while preparing from stream, see log for details", 
-            __FUNCTION__);
+            "Error while preparing from stream, see log for details");
     }
     //---------------------------------------------------------------------
     void Terrain::load(int lodLevel, bool synchronous)
@@ -1288,33 +1286,31 @@ namespace Ogre
         Vector3 v1 (endXTS, startYTS, getHeightAtPoint(endX, startY));
         Vector3 v2 (endXTS, endYTS, getHeightAtPoint(endX, endY));
         Vector3 v3 (startXTS, endYTS, getHeightAtPoint(startX, endY));
-        // define this plane in terrain space
-        Plane plane;
+        // define a plane in terrain space
+        // do not normalise as the normalization factor cancels out in the final
+        // equation anyway
+        Vector4 plane;
         if (startY % 2)
         {
             // odd row
             bool secondTri = ((1.0 - yParam) > xParam);
             if (secondTri)
-                plane.redefine(v0, v1, v3);
+                plane = Math::calculateFaceNormalWithoutNormalize(v0, v1, v3);
             else
-                plane.redefine(v1, v2, v3);
+                plane = Math::calculateFaceNormalWithoutNormalize(v1, v2, v3);
         }
         else
         {
             // even row
             bool secondTri = (yParam > xParam);
             if (secondTri)
-                plane.redefine(v0, v2, v3);
+                plane = Math::calculateFaceNormalWithoutNormalize(v0, v2, v3);
             else
-                plane.redefine(v0, v1, v2);
+                plane = Math::calculateFaceNormalWithoutNormalize(v0, v1, v2);
         }
 
         // Solve plane equation for z
-        return (-plane.normal.x * x 
-                -plane.normal.y * y
-                - plane.d) / plane.normal.z;
-
-
+        return (-plane.x * x - plane.y * y - plane.w) / plane.z;
     }
     //---------------------------------------------------------------------
     float Terrain::getHeightAtWorldPosition(Real x, Real y, Real z) const
@@ -2154,18 +2150,18 @@ namespace Ogre
                     getPointAlign(i, j + step, ALIGN_X_Y, &v2);
                     getPointAlign(i + step, j + step, ALIGN_X_Y, &v3);
 
-                    Plane t1, t2;
+                    Vector4 t1, t2;
                     bool backwardTri = false;
                     // Odd or even in terms of target level
                     if ((j / step) % 2 == 0)
                     {
-                        t1.redefine(v0, v1, v3);
-                        t2.redefine(v0, v3, v2);
+                        t1 = Math::calculateFaceNormalWithoutNormalize(v0, v1, v3);
+                        t2 = Math::calculateFaceNormalWithoutNormalize(v0, v3, v2);
                     }
                     else
                     {
-                        t1.redefine(v1, v3, v2);
-                        t2.redefine(v0, v1, v2);
+                        t1 = Math::calculateFaceNormalWithoutNormalize(v1, v3, v2);
+                        t2 = Math::calculateFaceNormalWithoutNormalize(v0, v1, v2);
                         backwardTri = true;
                     }
 
@@ -2199,17 +2195,17 @@ namespace Ogre
                             {
                                 // Solve for x/z
                                 interp_h = 
-                                    (-t1.normal.x * actualPos.x
-                                    - t1.normal.y * actualPos.y
-                                    - t1.d) / t1.normal.z;
+                                    (-t1.x * actualPos.x
+                                    - t1.y * actualPos.y
+                                    - t1.w) / t1.z;
                             }
                             else
                             {
                                 // Second tri
                                 interp_h = 
-                                    (-t2.normal.x * actualPos.x
-                                    - t2.normal.y * actualPos.y
-                                    - t2.d) / t2.normal.z;
+                                    (-t2.x * actualPos.x
+                                    - t2.y * actualPos.y
+                                    - t2.w) / t2.z;
                             }
 
                             Real actual_h = actualPos.z;
@@ -2484,7 +2480,7 @@ namespace Ogre
         return result;
     }
     //---------------------------------------------------------------------
-    std::pair<bool, Vector3> Terrain::checkQuadIntersection(int x, int z, const Ray& ray)
+    std::pair<bool, Vector3> Terrain::checkQuadIntersection(int x, int z, const Ray& ray) const
     {
         // build the two planes belonging to the quad's triangles
         Vector3 v1 ((Real)x, *getHeightData(x,z), (Real)z);
@@ -2492,7 +2488,7 @@ namespace Ogre
         Vector3 v3 ((Real)x, *getHeightData(x,z+1), (Real)z+1);
         Vector3 v4 ((Real)x+1, *getHeightData(x+1,z+1), (Real)z+1);
 
-        Plane p1, p2;
+        Vector4 p1, p2;
         bool oddRow = false;
         if (z % 2)
         {
@@ -2501,8 +2497,8 @@ namespace Ogre
             | \ |
             1---2
             */
-            p1.redefine(v2, v4, v3);
-            p2.redefine(v1, v2, v3);
+            p1 = Math::calculateFaceNormalWithoutNormalize(v2, v4, v3);
+            p2 = Math::calculateFaceNormalWithoutNormalize(v1, v2, v3);
             oddRow = true;
         }
         else
@@ -2512,15 +2508,15 @@ namespace Ogre
             | / |
             1---2
             */
-            p1.redefine(v1, v2, v4);
-            p2.redefine(v1, v4, v3);
+            p1 = Math::calculateFaceNormalWithoutNormalize(v1, v2, v4);
+            p2 = Math::calculateFaceNormalWithoutNormalize(v1, v4, v3);
         }
 
         // Test for intersection with the two planes. 
         // Then test that the intersection points are actually
         // still inside the triangle (with a small error margin)
         // Also check which triangle it is in
-        std::pair<bool, Real> planeInt = ray.intersects(p1);
+        RayTestResult planeInt = ray.intersects(Plane(p1));
         if (planeInt.first)
         {
             Vector3 where = ray.getPoint(planeInt.second);
@@ -2529,7 +2525,7 @@ namespace Ogre
                 && ((rel.x >= rel.z && !oddRow) || (rel.x >= (1 - rel.z) && oddRow))) // triangle bounds
                 return std::pair<bool, Vector3>(true, where);
         }
-        planeInt = ray.intersects(p2);
+        planeInt = ray.intersects(Plane(p2));
         if (planeInt.first)
         {
             Vector3 where = ray.getPoint(planeInt.second);
@@ -3360,7 +3356,6 @@ namespace Ogre
         //  | / | \ |
         //  5---6---7
 
-        Plane plane;
         for (long y = widenedRect.top; y < widenedRect.bottom; ++y)
         {
             for (long x = widenedRect.left; x < widenedRect.right; ++x)
@@ -3382,8 +3377,7 @@ namespace Ogre
 
                 for (int i = 0; i < 8; ++i)
                 {
-                    plane.redefine(centrePoint, adjacentPoints[i], adjacentPoints[(i+1)%8]);
-                    cumulativeNormal += plane.normal;
+                    cumulativeNormal += Math::calculateBasicFaceNormal(centrePoint, adjacentPoints[i], adjacentPoints[(i+1)%8]);
                 }
 
                 // normalise & store normal
@@ -4335,7 +4329,7 @@ namespace Ogre
         {
             if (isLoaded())
                 OGRE_EXCEPT(Exception::ERR_INVALID_STATE,
-                "Cannot alter the allocator when loaded!", __FUNCTION__);
+                "Cannot alter the allocator when loaded!");
 
             mCustomGpuBufferAllocator = alloc;
         }
